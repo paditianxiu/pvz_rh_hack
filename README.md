@@ -1,72 +1,106 @@
-# Welcome to Your New Wails3 Project!
+# PVZ 融合版辅助（pvz_rh_hack）
 
-Congratulations on generating your Wails3 application! This README will guide you through the next steps to get your project up and running.
+基于 Wails 3 + React + Go + C++ DLL 的桌面辅助工具，面向 `PlantsVsZombiesRH.exe`。  
+核心链路是：前端操作 -> Go 服务 -> 注入 DLL -> 命名管道 RPC -> 游戏内功能执行。
 
-## Getting Started
+## 项目图片
 
-1. Navigate to your project directory in the terminal.
+![项目图片](./images/image.png)
+![项目图片](./images/image2.png)
 
-2. To run your application in development mode, use the following command:
+## 功能概览
 
-   ```
-   wails3 dev
-   ```
+- 一键注入 / 卸载 DLL
+- 修改阳光数值（`SetSun`）
+- 功能开关（`SetFreeCD`、`SetRandomCard`）
+- 读取僵尸坐标并在透明悬浮窗绘制射线
+- 支持将 `payload` 目录内 DLL 内置到 EXE，运行时自动释放到缓存目录并注入
 
-   This will start your application and enable hot-reloading for both frontend and backend changes.
+## 技术架构
 
-3. To build your application for production, use:
+- 前端：React + TypeScript + Ant Design（`frontend/`）
+- 桌面容器：Wails v3（主窗 + `zombie-overlay` 透明窗口）
+- 后端：Go（进程管理、窗口同步、DLL 注入、IPC 客户端）
+- Native：C++ DLL（命名管道 `\\\\.\\pipe\\PVZModPipe`，处理游戏逻辑 RPC）
 
-   ```
-   wails3 build
-   ```
+## 环境要求
 
-   This will create a production-ready executable in the `build` directory.
+- Windows 10/11（当前核心能力仅 Windows 可用）
+- Go `1.25`
+- Node.js `18+` 与 npm
+- Wails CLI（`wails3`）
+- 可选：Visual Studio 2022（需要自行编译 `dll/` 时）
 
-## Exploring Wails3 Features
+## 快速开始
 
-Now that you have your project set up, it's time to explore the features that Wails3 offers:
+### 1) 安装依赖
 
-1. **Check out the examples**: The best way to learn is by example. Visit the `examples` directory in the `v3/examples` directory to see various sample applications.
+```bash
+cd frontend
+npm install
+cd ..
+```
 
-2. **Run an example**: To run any of the examples, navigate to the example's directory and use:
+### 2) 开发运行
 
-   ```
-   go run .
-   ```
+```bash
+wails3 task dev
+```
 
-   Note: Some examples may be under development during the alpha phase.
+或
 
-3. **Explore the documentation**: Visit the [Wails3 documentation](https://v3.wails.io/) for in-depth guides and API references.
+```bash
+wails3 dev -config ./build/config.yml -port 9245
+```
 
-4. **Join the community**: Have questions or want to share your progress? Join the [Wails Discord](https://discord.gg/JDdSxwjhGf) or visit the [Wails discussions on GitHub](https://github.com/wailsapp/wails/discussions).
+### 3) 构建
 
-## Project Structure
+```bash
+wails3 task build
+```
 
-Take a moment to familiarize yourself with your project structure:
+构建产物默认在 `bin/pvz_rh_hack.exe`。
 
-- `frontend/`: Contains your frontend code (HTML, CSS, JavaScript/TypeScript)
-- `main.go`: The entry point of your Go backend
-- `app.go`: Define your application structure and methods here
-- `wails.json`: Configuration file for your Wails project
+## DLL 与 payload 说明
 
-## Next Steps
+### 使用内置 DLL
 
-1. Modify the frontend in the `frontend/` directory to create your desired UI.
-2. Add backend functionality in `main.go`.
-3. Use `wails3 dev` to see your changes in real-time.
-4. When ready, build your application with `wails3 build`.
+- 构建时会打包 `payload/*.dll`
+- 注入时若前端未传入路径，会自动释放内置 DLL 到用户缓存目录后再注入
+- 推荐名称：`payload/MyDLL.dll`（代码中优先读取该文件）
 
-Happy coding with Wails3! If you encounter any issues or have questions, don't hesitate to consult the documentation or reach out to the Wails community.
+### 重新编译 DLL（可选）
 
-## 内置 DLL（打包进 EXE）
+1. 使用 Visual Studio 打开 `dll/MyDLL.sln`
+2. 编译 `x64 Release`
+3. 将产物覆盖到 `payload/MyDLL.dll`
+4. 重新执行构建
 
-当前项目已经支持将 DLL 内置到程序中，注入时不再依赖前端传入绝对路径。
+## 当前暴露的 RPC 方法
 
-1. 将真实 DLL 放到 `payload/` 目录（推荐文件名：`pvz_rh_payload.dll`）
-2. 执行 `wails3 build`（或 `go build`）
-3. 运行后端注入逻辑时会自动把内置 DLL 释放到用户缓存目录，再执行注入
+- `SetFreeCD(bool)`
+- `SetRandomCard(bool)`
+- `GetFreeCD()`
+- `SetSun(int32)`
+- `GetSun()`
+- `GetZombiePositions()`（返回 JSON 字符串）
 
-注意：
-- 如果 `payload/` 下没有任何 `.dll` 文件，会提示未找到内置 DLL。
-- 如果内置 DLL 不是有效 DLL（不是 PE 文件），注入时会返回错误。
-- 由于 `LoadLibraryW` 需要文件路径，内置 DLL 仍会在运行时落地到本地缓存目录，这是正常行为。
+## 目录结构
+
+```text
+.
+├─frontend/                 # React 前端
+├─dll/                      # C++ DLL 工程与源码
+├─payload/                  # 待嵌入的 DLL
+├─main.go                   # Wails 应用入口
+├─processservice.go         # 服务层与 Invoke 编解码
+├─process_service_windows.go# Windows 注入/进程/窗口实现
+└─embedded_dll_windows.go   # 内置 DLL 释放逻辑
+```
+
+## 注意事项
+
+- 本项目的进程名当前固定为 `PlantsVsZombiesRH.exe`。
+- 前端默认 `isDebug = true`，会优先使用绝对路径 `D:/Application/Code/Wails/pvz_rh_hack/payload/MyDLL.dll`；发布前建议改为 `false` 以走内置 DLL 流程。
+- 命名管道命令载荷上限为 256 字节（见 Go/C++ 双端定义）。
+- 涉及注入与内存操作，请仅用于合法、授权的本地测试场景。
