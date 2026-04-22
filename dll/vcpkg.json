@@ -1,0 +1,7 @@
+{
+  "name": "mydll",
+  "version": "1.0.0",
+  "dependencies": [
+    "glm"
+  ]
+}

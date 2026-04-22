@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=My Product
+Comment=A pvz_rh_hack application
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/pvz_rh_hack.exe %u
+Terminal=false
+Type=Application
+Icon=pvz_rh_hack.exe
+Categories=Utility;
+StartupWMClass=pvz_rh_hack.exe
+
+ 

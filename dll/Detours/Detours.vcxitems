@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <ItemsProjectGuid>{591d2bc2-3af3-4259-bbcb-f0cda1ac2a39}</ItemsProjectGuid>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(MSBuildThisFileDirectory)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ProjectCapability Include="SourceItemsFromImports" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(MSBuildThisFileDirectory)detours\creatwth.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)detours\detours.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)detours\disasm.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)detours\disolarm.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)detours\disolarm64.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)detours\disolia64.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)detours\disolx64.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)detours\disolx86.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)detours\image.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)detours\modules.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)detours\detours.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)detours\detver.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)stdpp\hook_manager.h" />
+  </ItemGroup>
+</Project>
