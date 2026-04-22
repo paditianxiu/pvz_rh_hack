@@ -40,6 +40,7 @@ const (
 	remoteThreadWaitMilliseconds = 5000
 
 	overlayWindowName = "zombie-overlay"
+	defaultWindowDPI  = 96
 )
 
 var (
@@ -50,6 +51,7 @@ var (
 	getWindowProc           = user32DLL.NewProc("GetWindow")
 	getClientRectProc       = user32DLL.NewProc("GetClientRect")
 	clientToScreenProc      = user32DLL.NewProc("ClientToScreen")
+	getDpiForWindowProc     = user32DLL.NewProc("GetDpiForWindow")
 	getForegroundWindowProc = user32DLL.NewProc("GetForegroundWindow")
 	kernel32DLL             = windows.NewLazySystemDLL("kernel32.dll")
 	createRemoteThreadProc  = kernel32DLL.NewProc("CreateRemoteThread")
@@ -300,13 +302,26 @@ func syncOverlayWindow(processName string) error {
 		return fmt.Errorf("未找到叠加窗口: %s", overlayWindowName)
 	}
 
-	bounds, err := getMainWindowBounds(processName)
+	pid, err := getProcessPID(processName)
 	if err != nil {
 		return err
 	}
 
-	overlayWindow.SetPosition(bounds.X, bounds.Y)
-	overlayWindow.SetSize(bounds.Width, bounds.Height)
+	windowHandle, err := findMainWindowByPID(pid)
+	if err != nil {
+		return err
+	}
+
+	bounds, err := getWindowBounds(windowHandle)
+	if err != nil {
+		return err
+	}
+
+	dpi := getWindowDPI(windowHandle)
+	logicalBounds := convertPhysicalBoundsToLogical(bounds, dpi)
+
+	overlayWindow.SetPosition(logicalBounds.X, logicalBounds.Y)
+	overlayWindow.SetSize(logicalBounds.Width, logicalBounds.Height)
 	overlayWindow.SetAlwaysOnTop(true)
 	overlayWindow.SetIgnoreMouseEvents(true)
 	return nil
@@ -538,6 +553,59 @@ func normalizeCallError(callErr error, fallback string) error {
 		return errors.New(fallback)
 	}
 	return callErr
+}
+
+func getWindowDPI(windowHandle windows.Handle) uint32 {
+	if windowHandle == 0 {
+		return defaultWindowDPI
+	}
+
+	result, _, err := getDpiForWindowProc.Call(uintptr(windowHandle))
+	if result == 0 {
+		if errors.Is(err, windows.ERROR_PROC_NOT_FOUND) {
+			return defaultWindowDPI
+		}
+		return defaultWindowDPI
+	}
+
+	return uint32(result)
+}
+
+func physicalToLogicalPixels(value int, dpi uint32) int {
+	if dpi == 0 {
+		return value
+	}
+
+	numerator := int64(value) * defaultWindowDPI
+	denominator := int64(dpi)
+
+	if numerator >= 0 {
+		return int((numerator + denominator/2) / denominator)
+	}
+
+	return int((numerator - denominator/2) / denominator)
+}
+
+func convertPhysicalBoundsToLogical(bounds *WindowBounds, dpi uint32) *WindowBounds {
+	if bounds == nil {
+		return nil
+	}
+
+	converted := &WindowBounds{
+		X:      physicalToLogicalPixels(bounds.X, dpi),
+		Y:      physicalToLogicalPixels(bounds.Y, dpi),
+		Width:  physicalToLogicalPixels(bounds.Width, dpi),
+		Height: physicalToLogicalPixels(bounds.Height, dpi),
+	}
+
+	if converted.Width < 1 {
+		converted.Width = 1
+	}
+	if converted.Height < 1 {
+		converted.Height = 1
+	}
+
+	return converted
 }
 
 type rawWindowRect struct {

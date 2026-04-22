@@ -1,4 +1,4 @@
-import { Events, Window } from '@wailsio/runtime';
+import { Call, Events, Window } from '@wailsio/runtime';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { overlayVisibilityEventName, overlayVisibilityStorageKey } from './constants/overlay';
 
@@ -11,6 +11,11 @@ type ZombiePoint = {
 };
 
 const zombiePollIntervalMs = 120;
+const gameProcessName = 'PlantsVsZombiesRH.exe';
+const syncOverlayMethodCandidates = [
+  'main.ProcessService.SyncOverlayWindow',
+  'changeme.ProcessService.SyncOverlayWindow',
+];
 
 
 function readOverlayVisibilityFromStorage(): boolean {
@@ -59,14 +64,38 @@ function parseZombiePositions(raw: string): ZombiePoint[] {
 
 }
 
+async function callFirstAvailable(candidates: string[], ...args: unknown[]) {
+  let lastError: unknown;
+
+  for (const methodName of candidates) {
+    try {
+      await Call.ByName(methodName, ...args);
+      return;
+    } catch (error: unknown) {
+      const errorName =
+        typeof error === 'object' && error !== null && 'name' in error
+          ? String((error as { name: unknown }).name)
+          : '';
+
+      if (errorName === 'ReferenceError') {
+        lastError = error;
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw lastError ?? new Error('未找到可用的 ProcessService 方法');
+}
+
 function OverlayPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [zombiePoints, setZombiePoints] = useState<ZombiePoint[]>([]);
-  const [overlayOrigin, setOverlayOrigin] = useState({ x: 0, y: 0 });
   const [overlayEnabled, setOverlayEnabled] = useState<boolean>(readOverlayVisibilityFromStorage);
 
   const draw = useMemo(
-    () => (canvas: HTMLCanvasElement, points: ZombiePoint[], originX: number) => {
+    () => (canvas: HTMLCanvasElement, points: ZombiePoint[]) => {
       const width = window.innerWidth;
       const height = window.innerHeight;
       if (width <= 0 || height <= 0) {
@@ -86,12 +115,12 @@ function OverlayPage() {
       context.clearRect(0, 0, width, height);
       const centerX = width / 2;
       const centerY = height / 2;
-      context.strokeStyle = 'rgba(255, 65, 65, 0.9)';
-      context.fillStyle = 'rgba(255, 65, 65, 0.95)';
+      context.strokeStyle = '#14f903e6';
+      context.fillStyle = '#14f903e6';
       context.lineWidth = 5;
       points.forEach((point) => {
         const localX = point.x / 1.5;
-        const localY = (height / 5) * (point.row + 0.2);
+        const localY = (height / 5) * (point.row + 0.5);
 
         context.beginPath();
         context.moveTo(centerX, centerY);
@@ -100,15 +129,11 @@ function OverlayPage() {
         context.beginPath();
         context.arc(localX, localY, 4, 0, Math.PI * 2);
         context.fill();
-
-        context.fillText(`Row:${point.row}`, localX, localY)
-
+        // context.fillText(`Row:${point.row}`, localX, localY)
         // context.fillText(`X:${localX}`, localX, localY)
-
         // context.fillText(`Y:${localY}`, localX, localY + 20)
-
       });
-      context.fillStyle = 'rgba(54, 214, 84, 0.95)';
+      context.fillStyle = '#ff0000f2';
       context.beginPath();
       context.arc(centerX, centerY, 5, 0, Math.PI * 2);
       context.fill();
@@ -142,14 +167,14 @@ function OverlayPage() {
     let disposed = false;
     const poll = async () => {
       try {
-        const position = await Window.Position();
-        if (disposed) {
+        if (!overlayEnabled) {
+          setZombiePoints((previousPoints) => (previousPoints.length === 0 ? previousPoints : []));
           return;
         }
 
-        setOverlayOrigin(position);
-        if (!overlayEnabled) {
-          setZombiePoints((previousPoints) => (previousPoints.length === 0 ? previousPoints : []));
+        await callFirstAvailable(syncOverlayMethodCandidates, gameProcessName);
+        await Window.SetAlwaysOnTop(true);
+        if (disposed) {
           return;
         }
 
@@ -181,7 +206,7 @@ function OverlayPage() {
     }
 
     const redraw = () => {
-      draw(canvas, zombiePoints, overlayOrigin.x);
+      draw(canvas, zombiePoints);
     };
 
     redraw();
@@ -189,7 +214,7 @@ function OverlayPage() {
     return () => {
       window.removeEventListener('resize', redraw);
     };
-  }, [draw, zombiePoints, overlayOrigin]);
+  }, [draw, zombiePoints]);
 
   return (
     <div className="overlay-root">

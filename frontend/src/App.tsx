@@ -28,10 +28,10 @@ type PlaceholderPageProps = {
   description: string;
 };
 
-type CheatToggleKey = 'freeCd' | 'randomCard';
+
 
 type CheatToggleConfig = {
-  key: CheatToggleKey;
+  key: string;
   label: string;
   invokeMethod: string;
 };
@@ -49,7 +49,7 @@ const cheatToggleConfigs: readonly CheatToggleConfig[] = [
   },
 ];
 
-const initialCheatToggleState: Record<CheatToggleKey, boolean> = {
+const initialCheatToggleState: Record<string, boolean> = {
   freeCd: false,
   randomCard: false,
 };
@@ -79,7 +79,7 @@ function App() {
   const location = useLocation();
   const gameName = 'PlantsVsZombiesRH.exe';
   const defaultSunValue = 9999;
-  const isDebug = true;
+  const isDebug = false;
   const dllPath = isDebug ? 'D:/Application/Code/Wails/pvz_rh_hack/payload/MyDLL.dll' : '';
 
   const navItems: NavItem[] = [
@@ -95,8 +95,8 @@ function App() {
   const [injecting, setInjecting] = useState(false);
   const [overlayVisible, setOverlayVisible] = useState(false);
   const [overlayLoading, setOverlayLoading] = useState(false);
-  const [cheatToggles, setCheatToggles] = useState<Record<CheatToggleKey, boolean>>(initialCheatToggleState);
-  const [cheatToggleLoading, setCheatToggleLoading] = useState<Record<CheatToggleKey, boolean>>(
+  const [cheatToggles, setCheatToggles] = useState<Record<string, boolean>>(initialCheatToggleState);
+  const [cheatToggleLoading, setCheatToggleLoading] = useState<Record<string, boolean>>(
     initialCheatToggleState,
   );
   const [sunValue, setSunValue] = useState<number>(defaultSunValue);
