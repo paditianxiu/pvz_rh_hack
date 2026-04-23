@@ -33,6 +33,8 @@ namespace board_runtime {
 		GetPosition_t g_getPosition = nullptr;
 		UnityResolve::Method* g_getEntityRowMethod = nullptr;
 		UnityResolve::Method* g_getEntityColumnMethod = nullptr;
+		UnityResolve::Class* g_zombieClass = nullptr;
+		UnityResolve::Field* g_zombieTypeField = nullptr;
 
 		void CacheBoardInstance(void* instance) {
 			std::lock_guard<std::mutex> lock(g_boardMutex);
@@ -107,6 +109,42 @@ namespace board_runtime {
 			}
 		}
 
+		bool SetBoardBoolField(const char* fieldName, bool enabled) {
+			try {
+				void* boardInstance = board_runtime::GetBoardInstance();
+				if (!boardInstance) {
+					LOG_ERROR("未找到 Board 实例！");
+					return false;
+				}
+
+				const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
+				if (!assembly) {
+					LOG_ERROR("未找到程序集！");
+					return false;
+				}
+
+				const auto boardClass = assembly->Get("Board");
+				if (!boardClass) {
+					LOG_ERROR("未找到 Board 类！");
+					return false;
+				}
+
+				const auto field = boardClass->Get<UnityResolve::Field>(fieldName);
+				if (!field) {
+					LOG_ERROR(std::format("未找到 {} 字段！", fieldName).c_str());
+					return false;
+				}
+
+				boardClass->SetValue(boardInstance, field->name, enabled);
+				LOG_INFO(std::format("{} 已设置为: {}，实例: 0x{:X}", fieldName, enabled, reinterpret_cast<uintptr_t>(boardInstance)).c_str());
+				return true;
+			}
+			catch (const std::exception& e) {
+				LOG_ERROR(std::format("{} 异常: {}", fieldName, e.what()).c_str());
+				return false;
+			}
+		}
+
 		bool ResolveZombiePositionMethods() {
 			if (!g_getTransform || !g_getPosition) {
 				const auto coreModule = UnityResolve::Get("UnityEngine.CoreModule.dll");
@@ -133,9 +171,12 @@ namespace board_runtime {
 			if (!g_getEntityRowMethod || !g_getEntityColumnMethod) {
 				const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
 				const auto playerClass = assembly ? assembly->Get("Player") : nullptr;
-				g_getEntityRowMethod = playerClass->Get<UnityResolve::Method>("get_Row");
-				g_getEntityColumnMethod = playerClass->Get<UnityResolve::Method>("get_Column");
+				if (playerClass) {
+					g_getEntityRowMethod = playerClass->Get<UnityResolve::Method>("get_Row");
+					g_getEntityColumnMethod = playerClass->Get<UnityResolve::Method>("get_Column");
+				}
 			}
+
 
 			return true;
 		}
@@ -159,6 +200,8 @@ namespace board_runtime {
 			g_getPosition = nullptr;
 			g_getEntityRowMethod = nullptr;
 			g_getEntityColumnMethod = nullptr;
+			g_zombieClass = nullptr;
+			g_zombieTypeField = nullptr;
 			g_hooksInstalled = false;
 		}
 	}
@@ -348,85 +391,42 @@ namespace board_runtime {
 				}
 				catch (...) {}
 			}
+			std::string name;
+			if (g_zombieClass && g_zombieTypeField) {
+				try {
+					UnityResolve::UnityType::Component* c = (UnityResolve::UnityType::Component*)zombie;
+				
+				
+					name = c->GetGameObject()->GetName()->ToString();
+				}
+				catch (...) {}
+			}
 
-			coordinates.push_back({
-				reinterpret_cast<std::uintptr_t>(zombie),
-				screenPos.x,
-				screenPos.y,
-				screenPos.z,
-				row,
-				column
-				});
+			ZombieCoordinate coordinate{};
+			coordinate.instance = reinterpret_cast<std::uintptr_t>(zombie);
+			coordinate.x = screenPos.x;
+			coordinate.y = screenPos.y;
+			coordinate.z = screenPos.z;
+			coordinate.row = row;
+			coordinate.column = column;
+			coordinate.name = name;
+			coordinates.push_back(coordinate);
 		}
 
 		return coordinates;
 	}
 
 	void SetFreeCD(bool enabled) {
-		try {
-			void* boardInstance = GetBoardInstance();
-			if (!boardInstance) {
-				LOG_ERROR("未找到 Board 实例！");
-				return;
-			}
-
-			const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
-			if (!assembly) {
-				LOG_ERROR("未找到程序集！");
-				return;
-			}
-
-			const auto boardClass = assembly->Get("Board");
-			if (!boardClass) {
-				LOG_ERROR("未找到 Board 类！");
-				return;
-			}
-
-			const auto freeCD = boardClass->Get<UnityResolve::Field>("freeCD");
-			if (!freeCD) {
-				LOG_ERROR("未找到 freeCD 字段！");
-				return;
-			}
-			boardClass->SetValue(boardInstance, freeCD->name, enabled ? 1 : 0);
-			LOG_INFO(std::format("freeCD 已设置为: {}，实例: 0x{:X}", enabled, reinterpret_cast<uintptr_t>(boardInstance)).c_str());
-		}
-		catch (const std::exception& e) {
-			LOG_ERROR(std::format("freeCD 异常: {}", e.what()).c_str());
-		}
+		SetBoardBoolField("freeCD", enabled);
 	}
 
 
 	void SetRandomCard(bool enabled) {
-		try {
-			void* boardInstance = GetBoardInstance();
-			if (!boardInstance) {
-				LOG_ERROR("未找到 Board 实例！");
-				return;
-			}
+		SetBoardBoolField("randomCard", enabled);
+	}
 
-			const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
-			if (!assembly) {
-				LOG_ERROR("未找到程序集！");
-				return;
-			}
-
-			const auto boardClass = assembly->Get("Board");
-			if (!boardClass) {
-				LOG_ERROR("未找到 Board 类！");
-				return;
-			}
-
-			const auto randomCard = boardClass->Get<UnityResolve::Field>("randomCard");
-			if (!randomCard) {
-				LOG_ERROR("未找到 randomCard 字段！");
-				return;
-			}
-			boardClass->SetValue(boardInstance, randomCard->name, enabled ? 1 : 0);
-			LOG_INFO(std::format("randomCard 已设置为: {}，实例: 0x{:X}", enabled, reinterpret_cast<uintptr_t>(boardInstance)).c_str());
-		}
-		catch (const std::exception& e) {
-			LOG_ERROR(std::format("randomCard 异常: {}", e.what()).c_str());
-		}
+	void SetRightPutPot(bool enabled) {
+		SetBoardBoolField("rightPutPot", enabled);
 	}
 
 	bool GetFreeCD() {

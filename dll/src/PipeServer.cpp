@@ -280,6 +280,45 @@ namespace ipc {
 			return text.size() >= prefix.size() && text.substr(0, prefix.size()) == prefix;
 		}
 
+		std::string EscapeJsonString(std::string_view text) {
+			std::string escaped;
+			escaped.reserve(text.size() + 8);
+			for (const unsigned char ch : text) {
+				switch (ch) {
+				case '\"':
+					escaped.append("\\\"");
+					break;
+				case '\\':
+					escaped.append("\\\\");
+					break;
+				case '\b':
+					escaped.append("\\b");
+					break;
+				case '\f':
+					escaped.append("\\f");
+					break;
+				case '\n':
+					escaped.append("\\n");
+					break;
+				case '\r':
+					escaped.append("\\r");
+					break;
+				case '\t':
+					escaped.append("\\t");
+					break;
+				default:
+					if (ch < 0x20) {
+						escaped.append(std::format("\\u{:04X}", static_cast<uint32_t>(ch)));
+					}
+					else {
+						escaped.push_back(static_cast<char>(ch));
+					}
+					break;
+				}
+			}
+			return escaped;
+		}
+
 		bool ToBool(const RpcValue& value) {
 			switch (value.type) {
 			case RpcValueType::Bool:
@@ -347,18 +386,20 @@ namespace ipc {
 		std::string SerializeZombieCoordinates() {
 			const auto coordinates = board_runtime::GetZombieCoordinates();
 			std::string serialized;
-			serialized.reserve(coordinates.size() * 64 + 2);
+			serialized.reserve(coordinates.size() * 96 + 2);
 			serialized.push_back('[');
 			bool first = true;
 
 			for (const auto& coordinate : coordinates) {
+				const std::string escapedName = EscapeJsonString(coordinate.name);
 				const std::string item = std::format(
-					"{{\"X\":{:.2f},\"Y\":{:.2f},\"Z\":{:.2f},\"Row\":{},\"Column\":{}}}",
+					"{{\"X\":{:.2f},\"Y\":{:.2f},\"Z\":{:.2f},\"Row\":{},\"Column\":{},\"Name\":\"{}\"}}",
 					coordinate.x,
 					coordinate.y,
 					coordinate.z,
 					coordinate.row,
-					coordinate.column
+					coordinate.column,
+					escapedName
 				);
 
 				if (!first) {
@@ -368,6 +409,47 @@ namespace ipc {
 				first = false;
 			}
 			serialized.push_back(']');
+
+			return serialized;
+		}
+
+		std::string SerializeZombieTypeNameMap() {
+			const auto coordinates = board_runtime::GetZombieCoordinates();
+			std::unordered_map<int, std::string> typeNameMap;
+			typeNameMap.reserve(coordinates.size());
+			for (const auto& coordinate : coordinates) {
+				if (coordinate.name.empty()) {
+					continue;
+				}
+				typeNameMap.try_emplace(coordinate.zombieType, coordinate.name);
+			}
+
+			std::vector<int> sortedTypes;
+			sortedTypes.reserve(typeNameMap.size());
+			for (const auto& [zombieType, _] : typeNameMap) {
+				sortedTypes.push_back(zombieType);
+			}
+			std::sort(sortedTypes.begin(), sortedTypes.end());
+
+			std::string serialized;
+			serialized.reserve(typeNameMap.size() * 24 + 2);
+			serialized.push_back('{');
+			bool first = true;
+			for (const auto zombieType : sortedTypes) {
+				const auto it = typeNameMap.find(zombieType);
+				if (it == typeNameMap.end()) {
+					continue;
+				}
+
+				const std::string escapedName = EscapeJsonString(it->second);
+				const std::string item = std::format("\"{}\":\"{}\"", zombieType, escapedName);
+				if (!first) {
+					serialized.push_back(',');
+				}
+				serialized.append(item);
+				first = false;
+			}
+			serialized.push_back('}');
 
 			return serialized;
 		}
@@ -395,6 +477,18 @@ namespace ipc {
 
 						const bool enabled = ToBool(args[0]);
 						board_runtime::SetRandomCard(enabled);
+						return RpcValue::FromBool(enabled);
+					}
+				},
+				{
+					"SetRightPutPot",
+					[](const std::vector<RpcValue>& args) -> RpcValue {
+						if (args.size() != 1) {
+							throw std::runtime_error("SetRightPutPot 需要 1 个参数");
+						}
+
+						const bool enabled = ToBool(args[0]);
+						board_runtime::SetRightPutPot(enabled);
 						return RpcValue::FromBool(enabled);
 					}
 				},

@@ -1,14 +1,8 @@
 import { Call, Events, Window } from '@wailsio/runtime';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { overlayVisibilityEventName, overlayVisibilityStorageKey } from './constants/overlay';
-
-type ZombiePoint = {
-  x: number;
-  y: number;
-  z: number;
-  row: number;
-  column: number;
-};
+import { parseZombiePositions } from './features/zombie/parser';
+import { type ZombiePoint } from './features/zombie/types';
 
 const zombiePollIntervalMs = 120;
 const gameProcessName = 'PlantsVsZombiesRH.exe';
@@ -24,44 +18,6 @@ function readOverlayVisibilityFromStorage(): boolean {
   } catch {
     return false;
   }
-}
-
-
-function parseFiniteNumber(value: unknown): number | null {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null;
-  }
-
-  if (typeof value === 'string') {
-    const parsed = Number.parseFloat(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  return null;
-}
-
-function parseZombiePositions(raw: string): ZombiePoint[] {
-
-  const parsed = JSON.parse(raw);
-
-  return parsed
-    .map((item) => {
-      if (!item || typeof item !== 'object') {
-        return null;
-      }
-
-      const record = item as Record<string, unknown>;
-      const x = parseFiniteNumber(record.X);
-      const y = parseFiniteNumber(record.Y);
-      const z = parseFiniteNumber(record.Z);
-      const row = parseFiniteNumber(record.Row);
-      const column = parseFiniteNumber(record.Colum);
-
-
-      return { x, y, z, row, column };
-    })
-    .filter((point): point is ZombiePoint => point !== null);
-
 }
 
 async function callFirstAvailable(candidates: string[], ...args: unknown[]) {
@@ -116,7 +72,7 @@ function OverlayPage() {
       const centerX = width / 2;
       const centerY = height / 2;
       context.strokeStyle = '#14f903e6';
-      context.fillStyle = '#14f903e6';
+      context.fillStyle = '#ffff0be6';
       context.lineWidth = 5;
       points.forEach((point) => {
         const localX = point.x / 1.5;
@@ -129,7 +85,7 @@ function OverlayPage() {
         context.beginPath();
         context.arc(localX, localY, 4, 0, Math.PI * 2);
         context.fill();
-        // context.fillText(`Row:${point.row}`, localX, localY)
+        context.fillText(point.name, localX, localY)
         // context.fillText(`X:${localX}`, localX, localY)
         // context.fillText(`Y:${localY}`, localX, localY + 20)
       });

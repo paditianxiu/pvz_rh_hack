@@ -1,0 +1,277 @@
+.history-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.history-subtitle {
+  margin-top: -2px;
+  font-size: 13px;
+  color: #8a8f99;
+}
+
+.history-summary-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.history-summary-card {
+  background: #fff;
+  border: 1px solid #eceef2;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.history-summary-label {
+  font-size: 13px;
+  color: #808794;
+}
+
+.history-summary-value {
+  margin-top: 6px;
+  font-size: 26px;
+  font-weight: 700;
+  color: #1f2329;
+  line-height: 1.1;
+}
+
+.history-status-row {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #6f7682;
+  font-size: 12px;
+}
+
+.history-status-error {
+  color: #cf1322;
+}
+
+.history-chart-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.history-chart-card {
+  background: #fff;
+  border: 1px solid #eceef2;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.history-chart-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2329;
+  margin-bottom: 8px;
+}
+
+.history-chart-empty {
+  font-size: 13px;
+  color: #8a8f99;
+  min-height: 90px;
+  display: flex;
+  align-items: center;
+}
+
+.history-trend-chart {
+  width: 100%;
+  height: 220px;
+  display: block;
+}
+
+.history-radar-chart {
+  width: 100%;
+  height: 320px;
+  display: block;
+}
+
+.history-trend-axis-label {
+  fill: #8a8f99;
+  font-size: 11px;
+}
+
+.history-radar-grid {
+  fill: none;
+  stroke: #e6eaf2;
+  stroke-width: 1;
+}
+
+.history-radar-spoke {
+  stroke: #d8e0ed;
+  stroke-width: 1;
+}
+
+.history-radar-label {
+  fill: #6f7682;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.history-radar-polygon {
+  fill: rgba(47, 124, 255, 0.16);
+  stroke: rgba(47, 124, 255, 0.7);
+  stroke-width: 1.5;
+}
+
+.history-radar-dot {
+  fill: #2f7cff;
+  fill-opacity: 0.82;
+}
+
+.history-radar-center-dot {
+  fill: #1f2329;
+}
+
+.history-lane-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-lane-row {
+  display: grid;
+  grid-template-columns: 72px 1fr 44px;
+  gap: 8px;
+  align-items: center;
+}
+
+.history-lane-label {
+  font-size: 12px;
+  color: #666f7d;
+}
+
+.history-lane-track {
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #edf0f6;
+}
+
+.history-lane-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #55a2ff, #2f7cff);
+}
+
+.history-lane-value {
+  text-align: right;
+  font-size: 12px;
+  color: #2d3340;
+  font-weight: 600;
+}
+
+.history-histogram-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.history-histogram-bars {
+  min-height: 168px;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(56px, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.history-histogram-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-histogram-bar-box {
+  height: 130px;
+  border-radius: 8px;
+  background: #f1f4fa;
+  display: flex;
+  align-items: flex-end;
+  padding: 3px;
+}
+
+.history-histogram-bar {
+  width: 100%;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #7bb6ff, #2f7cff);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.history-histogram-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 3px;
+  line-height: 1;
+}
+
+.history-histogram-label {
+  font-size: 11px;
+  color: #6f7682;
+  text-align: center;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.history-heatmap-root {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-heatmap-grid {
+  display: grid;
+  gap: 3px;
+}
+
+.history-heatmap-row-wrapper {
+  display: contents;
+}
+
+.history-heatmap-row-label {
+  font-size: 12px;
+  color: #666f7d;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  white-space: nowrap;
+}
+
+.history-heatmap-cell {
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+.history-heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #7a828e;
+}
+
+.history-heatmap-legend-gradient {
+  width: 120px;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, hsl(210, 78%, 92%), hsl(40, 78%, 48%));
+}
+
+@media (max-width: 900px) {
+  .history-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .history-histogram-bars {
+    min-width: 560px;
+  }
+}

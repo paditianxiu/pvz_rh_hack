@@ -1,6 +1,7 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace board_runtime {
@@ -11,6 +12,8 @@ namespace board_runtime {
 		float z;
 		int row;
 		int column;
+		int zombieType;
+		std::string name;
 	};
 
 	bool InstallBoardHooks();
@@ -21,6 +24,7 @@ namespace board_runtime {
 
 	void SetRandomCard(bool enabled);
 	void SetFreeCD(bool enabled);
+	void SetRightPutPot(bool enabled);
 	bool GetFreeCD();
 	int GetBoardWave();
 	int GetSun();

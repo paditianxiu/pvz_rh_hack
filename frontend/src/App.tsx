@@ -1,7 +1,7 @@
 import {
-  ClockCircleOutlined,
   CodepenOutlined,
   DatabaseOutlined,
+  ExperimentOutlined,
   InfoCircleOutlined,
   SettingOutlined,
   ToolOutlined,
@@ -15,6 +15,7 @@ import { GetProcessPID, InjectDLL, UnloadDLL } from '../bindings/changeme/proces
 import { overlayVisibilityEventName, overlayVisibilityStorageKey } from './constants/overlay';
 import OverlayPage from './OverlayPage';
 import SettingRow from './components/SettingRow';
+import HistoryPage from './pages/history/HistoryPage';
 import './App.css';
 
 type NavItem = {
@@ -46,6 +47,11 @@ const cheatToggleConfigs: readonly CheatToggleConfig[] = [
     key: 'randomCard',
     label: '随机卡槽',
     invokeMethod: 'SetRandomCard',
+  },
+  {
+    key: 'rightPutPot',
+    label: '右键放罐子',
+    invokeMethod: 'SetRightPutPot',
   },
 ];
 
@@ -79,12 +85,12 @@ function App() {
   const location = useLocation();
   const gameName = 'PlantsVsZombiesRH.exe';
   const defaultSunValue = 9999;
-  const isDebug = false;
+  const isDebug = true;
   const dllPath = isDebug ? 'D:/Application/Code/Wails/pvz_rh_hack/payload/MyDLL.dll' : '';
 
   const navItems: NavItem[] = [
     { path: '/clipboard', label: '常用功能', icon: <CodepenOutlined /> },
-    { path: '/history', label: '对局记录', icon: <ClockCircleOutlined /> },
+    { path: '/history', label: '僵尸数据', icon: <ExperimentOutlined /> },
     { path: '/general', label: '功能开关', icon: <SettingOutlined /> },
     { path: '/shortcuts', label: '快捷操作', icon: <ToolOutlined /> },
     { path: '/backup', label: '存档备份', icon: <DatabaseOutlined /> },
@@ -318,7 +324,7 @@ function App() {
             />
             <Route
               path="/history"
-              element={<PlaceholderPage title="对局记录" description="这里可以放对局历史与统计信息。" />}
+              element={<HistoryPage />}
             />
             <Route
               path="/general"
