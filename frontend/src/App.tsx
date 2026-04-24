@@ -299,7 +299,7 @@ function App() {
                           </Button>
                         </div>
                       </SettingRow>
-                      <SettingRow label="下一波">
+                      <SettingRow label="测试">
                         <div className="setting-actions">
                           <Button type="primary" onClick={async () => {
                             const raw = await "GetBoardFields".invoke()
