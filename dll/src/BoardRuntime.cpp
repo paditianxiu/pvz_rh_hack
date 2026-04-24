@@ -37,43 +37,14 @@ namespace board_runtime {
 		GetPosition_t g_getPosition = nullptr;
 		UnityResolve::Method* g_getEntityRowMethod = nullptr;
 		UnityResolve::Method* g_getEntityColumnMethod = nullptr;
-		UnityResolve::Class* g_zombieClass = nullptr;
-		UnityResolve::Field* g_zombieTypeField = nullptr;
 
 		bool SetAllCardUICooldown(float cooldown);
 
-		void CacheBoardInstance(void* instance) {
-			std::lock_guard<std::mutex> lock(g_boardMutex);
-			g_boardInstance = instance;
-		}
-
-		void ClearBoardInstance(void* instance) {
-			std::lock_guard<std::mutex> lock(g_boardMutex);
-			if (g_boardInstance == instance) {
-				g_boardInstance = nullptr;
-			}
-		}
-
-		void AddZombieInstance(void* instance) {
-			if (!instance) {
-				return;
-			}
-
-			std::lock_guard<std::mutex> lock(g_zombieMutex);
-			g_zombieInstances.insert(instance);
-		}
-
-		void RemoveZombieInstance(void* instance) {
-			if (!instance) {
-				return;
-			}
-
-			std::lock_guard<std::mutex> lock(g_zombieMutex);
-			g_zombieInstances.erase(instance);
-		}
-
 		void HookedBoardAwake(void* _this) {
-			CacheBoardInstance(_this);
+			{
+				std::lock_guard<std::mutex> lock(g_boardMutex);
+				g_boardInstance = _this;
+			}
 			LOG_INFO(std::format("[钩子] 已调用 Board::Awake，this: 0x{:X}", reinterpret_cast<uintptr_t>(_this)).c_str());
 
 			if (g_originalBoardAwake) {
@@ -82,7 +53,10 @@ namespace board_runtime {
 		}
 
 		void HookedBoardStart(void* _this) {
-			CacheBoardInstance(_this);
+			{
+				std::lock_guard<std::mutex> lock(g_boardMutex);
+				g_boardInstance = _this;
+			}
 			LOG_INFO(std::format("[钩子] 已调用 Board::Start，this: 0x{:X}", reinterpret_cast<uintptr_t>(_this)).c_str());
 
 			if (g_originalBoardStart) {
@@ -92,7 +66,12 @@ namespace board_runtime {
 
 		void HookedBoardOnDestroy(void* _this) {
 			LOG_INFO(std::format("[钩子] 已调用 Board::OnDestroy，this: 0x{:X}", reinterpret_cast<uintptr_t>(_this)).c_str());
-			ClearBoardInstance(_this);
+			{
+				std::lock_guard<std::mutex> lock(g_boardMutex);
+				if (g_boardInstance == _this) {
+					g_boardInstance = nullptr;
+				}
+			}
 
 			if (g_originalBoardOnDestroy) {
 				g_originalBoardOnDestroy(_this);
@@ -100,7 +79,10 @@ namespace board_runtime {
 		}
 
 		void HookedZombieFixedUpdate(void* _this) {
-			AddZombieInstance(_this);
+			if (_this) {
+				std::lock_guard<std::mutex> lock(g_zombieMutex);
+				g_zombieInstances.insert(_this);
+			}
 
 			if (g_originalZombieFixedUpdate) {
 				g_originalZombieFixedUpdate(_this);
@@ -108,7 +90,10 @@ namespace board_runtime {
 		}
 
 		void HookedZombieOnDestroy(void* _this) {
-			RemoveZombieInstance(_this);
+			if (_this) {
+				std::lock_guard<std::mutex> lock(g_zombieMutex);
+				g_zombieInstances.erase(_this);
+			}
 
 			if (g_originalZombieOnDestroy) {
 				g_originalZombieOnDestroy(_this);
@@ -157,100 +142,6 @@ namespace board_runtime {
 			}
 			catch (const std::exception& e) {
 				LOG_ERROR(std::format("{} 异常: {}", fieldName, e.what()).c_str());
-				return false;
-			}
-		}
-
-		UnityResolve::Field* GetBoardTagField(UnityResolve::Class* boardClass) {
-			if (!boardClass) {
-				return nullptr;
-			}
-
-			if (const auto boardTagField = boardClass->Get<UnityResolve::Field>("BoardTag")) {
-				return boardTagField;
-			}
-
-			return boardClass->Get<UnityResolve::Field>("boardTag");
-		}
-
-		UnityResolve::Class* ResolveBoardTagClass(UnityResolve::Assembly* assembly) {
-			if (!assembly) {
-				return nullptr;
-			}
-
-			if (const auto boardTagClass = assembly->Get("BoardTag")) {
-				return boardTagClass;
-			}
-
-			for (const auto klass : assembly->classes) {
-				if (!klass) {
-					continue;
-				}
-
-				if (klass->Get<UnityResolve::Field>("pvpScaryPot")) {
-					return klass;
-				}
-			}
-
-			return nullptr;
-		}
-
-		bool SetBoardTagPvpScaryPot(bool enabled) {
-			try {
-				void* boardInstance = board_runtime::GetBoardInstance();
-				if (!boardInstance) {
-					LOG_ERROR("未找到 Board 实例！");
-					return false;
-				}
-
-				const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
-				if (!assembly) {
-					LOG_ERROR("未找到程序集！");
-					return false;
-				}
-
-				const auto boardClass = assembly->Get("Board");
-				if (!boardClass) {
-					LOG_ERROR("未找到 Board 类！");
-					return false;
-				}
-
-				const auto boardTagField = GetBoardTagField(boardClass);
-				if (!boardTagField) {
-					LOG_ERROR("未找到 BoardTag 字段！");
-					return false;
-				}
-
-				const auto boardTagClass = ResolveBoardTagClass(assembly);
-				if (!boardTagClass) {
-					LOG_ERROR("未找到 BoardTag 类！");
-					return false;
-				}
-
-				const auto pvpScaryPotField = boardTagClass->Get<UnityResolve::Field>("pvpScaryPot");
-				if (!pvpScaryPotField) {
-					LOG_ERROR("未找到 BoardTag.pvpScaryPot 字段！");
-					return false;
-				}
-
-				auto* const boardTagInstance = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(boardInstance) + boardTagField->offset);
-				boardTagClass->SetValue(boardTagInstance, pvpScaryPotField->name, enabled);
-				LOG_INFO(std::format("BoardTag.pvpScaryPot 已设置为: {}，实例: 0x{:X}", enabled, reinterpret_cast<uintptr_t>(boardInstance)).c_str());
-
-				const auto isScaryPotField = boardTagClass->Get<UnityResolve::Field>("isScaryPot");
-				if (!isScaryPotField) {
-					LOG_ERROR("未找到 BoardTag.isScaryPot 字段！");
-					return false;
-				}
-
-				boardTagClass->SetValue(boardTagInstance, isScaryPotField->name, enabled);
-				LOG_INFO(std::format("BoardTag.isScaryPot 已设置为: {}，实例: 0x{:X}", enabled, reinterpret_cast<uintptr_t>(boardInstance)).c_str());
-
-
-				return true;
-			}
-			catch (const std::exception& e) {
-				LOG_ERROR(std::format("设置 BoardTag.pvpScaryPot 异常: {}", e.what()).c_str());
 				return false;
 			}
 		}
@@ -336,7 +227,6 @@ namespace board_runtime {
 				}
 			}
 
-
 			return true;
 		}
 
@@ -360,8 +250,6 @@ namespace board_runtime {
 			g_getPosition = nullptr;
 			g_getEntityRowMethod = nullptr;
 			g_getEntityColumnMethod = nullptr;
-			g_zombieClass = nullptr;
-			g_zombieTypeField = nullptr;
 			g_hooksInstalled = false;
 			g_freeCDAutoRefreshEnabled.store(false, std::memory_order_release);
 		}
@@ -558,15 +446,16 @@ namespace board_runtime {
 				catch (...) {}
 			}
 			std::string name;
-			if (g_zombieClass && g_zombieTypeField) {
-				try {
-					UnityResolve::UnityType::Component* c = (UnityResolve::UnityType::Component*)zombie;
-				
-				
-					name = c->GetGameObject()->GetName()->ToString();
+			try {
+				auto* const component = reinterpret_cast<UnityResolve::UnityType::Component*>(zombie);
+				if (component) {
+					auto* const gameObject = component->GetGameObject();
+					if (gameObject && gameObject->GetName()) {
+						name = gameObject->GetName()->ToString();
+					}
 				}
-				catch (...) {}
 			}
+			catch (...) {}
 
 			ZombieCoordinate coordinate{};
 			coordinate.instance = reinterpret_cast<std::uintptr_t>(zombie);
@@ -590,13 +479,71 @@ namespace board_runtime {
 		}
 	}
 
-
 	void SetRandomCard(bool enabled) {
 		SetBoardBoolField("randomCard", enabled);
 	}
 
 	void SetRightPutPot(bool enabled) {
-		SetBoardTagPvpScaryPot(enabled);
+		try {
+			do {
+				void* boardInstance = GetBoardInstance();
+				if (!boardInstance) {
+					LOG_ERROR("未找到 Board 实例！");
+					break;
+				}
+
+				const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
+				if (!assembly) {
+					LOG_ERROR("未找到程序集！");
+					break;
+				}
+
+				const auto boardClass = assembly->Get("Board");
+				if (!boardClass) {
+					LOG_ERROR("未找到 Board 类！");
+					break;
+				}
+
+				auto boardTagField = boardClass->Get<UnityResolve::Field>("BoardTag");
+				if (!boardTagField) {
+					boardTagField = boardClass->Get<UnityResolve::Field>("boardTag");
+				}
+				if (!boardTagField) {
+					LOG_ERROR("未找到 BoardTag 字段！");
+					break;
+				}
+
+				UnityResolve::Class* boardTagClass = assembly->Get("BoardTag");
+				if (!boardTagClass) {
+					for (const auto klass : assembly->classes) {
+						if (klass && klass->Get<UnityResolve::Field>("pvpScaryPot")) {
+							boardTagClass = klass;
+							break;
+						}
+					}
+				}
+				if (!boardTagClass) {
+					LOG_ERROR("未找到 BoardTag 类！");
+					break;
+				}
+
+				const auto pvpScaryPotField = boardTagClass->Get<UnityResolve::Field>("pvpScaryPot");
+				const auto isScaryPotField = boardTagClass->Get<UnityResolve::Field>("isScaryPot");
+				if (!pvpScaryPotField || !isScaryPotField) {
+					LOG_ERROR("未找到 BoardTag.pvpScaryPot 或 BoardTag.isScaryPot 字段！");
+					break;
+				}
+
+				auto* const boardTagInstance = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(boardInstance) + boardTagField->offset);
+				boardTagClass->SetValue(boardTagInstance, pvpScaryPotField->name, enabled);
+				boardTagClass->SetValue(boardTagInstance, isScaryPotField->name, enabled);
+				LOG_INFO(std::format("BoardTag 字段已设置为: {}，实例: 0x{:X}", enabled, reinterpret_cast<uintptr_t>(boardInstance)).c_str());
+			} while (false);
+		}
+		catch (const std::exception& e) {
+			LOG_ERROR(std::format("设置 BoardTag 字段异常: {}", e.what()).c_str());
+		}
+
 		SetBoardBoolField("rightPutPot", enabled);
 	}
 
@@ -617,9 +564,6 @@ namespace board_runtime {
 			if (!boardClass) {
 				return false;
 			}
-
-
-
 			const auto freeCD = boardClass->Get<UnityResolve::Field>("freeCD");
 			if (freeCD) {
 				return boardClass->GetValue<int>(boardInstance, freeCD->name) == 1;
@@ -633,7 +577,6 @@ namespace board_runtime {
 	}
 
 	int GetBoardWave() {
-
 		try {
 			void* boardInstance = GetBoardInstance();
 			if (!boardInstance) {
