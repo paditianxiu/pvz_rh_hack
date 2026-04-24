@@ -25,7 +25,11 @@ namespace board_runtime {
 	void SetRandomCard(bool enabled);
 	void SetFreeCD(bool enabled);
 	void SetRightPutPot(bool enabled);
+	void CreateFireLine(int theFireRow);
+	void SetPit(int theColumn, int theRo);
+	bool StartNextRound();
 	bool GetFreeCD();
+	std::string GetBoardFieldsJson();
 	int GetBoardWave();
 	int GetSun();
 	void SetSun(int sunCount);

@@ -16,6 +16,7 @@ import { overlayVisibilityEventName, overlayVisibilityStorageKey } from './const
 import OverlayPage from './OverlayPage';
 import SettingRow from './components/SettingRow';
 import HistoryPage from './pages/history/HistoryPage';
+import TerrainPage from './pages/terrain/TerrainPage';
 import './App.css';
 
 type NavItem = {
@@ -80,13 +81,13 @@ function App() {
   const location = useLocation();
   const gameName = 'PlantsVsZombiesRH.exe';
   const defaultSunValue = 9999;
-  const isDebug = false;
+  const isDebug = true;
   const dllPath = isDebug ? 'D:/Application/Code/Wails/pvz_rh_hack/payload/MyDLL.dll' : '';
 
   const navItems: NavItem[] = [
     { path: '/clipboard', label: '常用功能', icon: <CodepenOutlined /> },
     { path: '/history', label: '僵尸数据', icon: <ExperimentOutlined /> },
-    { path: '/general', label: '功能开关', icon: <SettingOutlined /> },
+    { path: '/general', label: '地形操作', icon: <SettingOutlined /> },
     { path: '/shortcuts', label: '快捷操作', icon: <ToolOutlined /> },
     { path: '/backup', label: '存档备份', icon: <DatabaseOutlined /> },
     { path: '/about', label: '关于工具', icon: <InfoCircleOutlined /> },
@@ -298,6 +299,16 @@ function App() {
                           </Button>
                         </div>
                       </SettingRow>
+                      <SettingRow label="下一波">
+                        <div className="setting-actions">
+                          <Button type="primary" onClick={async () => {
+                            const raw = await "GetBoardFields".invoke()
+                            console.log(JSON.parse(raw as string))
+                          }}>
+                            应用
+                          </Button>
+                        </div>
+                      </SettingRow>
                       {cheatToggleConfigs.map((config) => (
                         <SettingRow key={config.key} label={config.label}>
                           <Switch
@@ -307,11 +318,6 @@ function App() {
                           />
                         </SettingRow>
                       ))}
-                      {/* <Button onClick={async () => {
-                        const raw = await 'GetZombiePositions'.invoke();
-                        console.log(raw)
-                      }}>僵尸</Button> */}
-
                     </div>
                   </section>
                 </>
@@ -323,7 +329,7 @@ function App() {
             />
             <Route
               path="/general"
-              element={<PlaceholderPage title="功能开关" description="这里可以放全局功能的启停控制。" />}
+              element={<TerrainPage isInjected={isInjected} />}
             />
             <Route
               path="/shortcuts"

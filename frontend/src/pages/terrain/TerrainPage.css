@@ -1,0 +1,203 @@
+.terrain-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.terrain-subtitle {
+  margin-top: -2px;
+  font-size: 13px;
+  color: #8a8f99;
+}
+
+.terrain-summary-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.terrain-summary-card {
+  border: 1px solid #eceef2;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.terrain-summary-label {
+  font-size: 12px;
+  color: #7a818d;
+}
+
+.terrain-summary-value {
+  margin-top: 6px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2329;
+  line-height: 1.1;
+}
+
+.terrain-summary-time {
+  font-size: 15px;
+  word-break: break-word;
+}
+
+.terrain-empty {
+  margin-top: 12px;
+  border: 1px dashed #d8deea;
+  border-radius: 10px;
+  background: #f8f9fc;
+  color: #7a8291;
+  font-size: 13px;
+  padding: 12px;
+}
+
+.terrain-error {
+  margin-top: 12px;
+  border-radius: 10px;
+  border: 1px solid #ffd8dc;
+  background: #fff2f3;
+  color: #c33b46;
+  font-size: 12px;
+  padding: 10px 12px;
+}
+
+.terrain-grid-card {
+  margin-top: 12px;
+  border: 1px solid #eceef2;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.terrain-grid-toolbar {
+  border-bottom: 1px solid #eceef2;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #626b7a;
+}
+
+.terrain-grid-scroll {
+  padding: 12px;
+  overflow: auto;
+}
+
+.terrain-grid {
+  display: grid;
+  gap: 5px;
+  min-width: max-content;
+}
+
+.terrain-cell {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #d8deea;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #fefefe 0%, #f3f6fc 100%);
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #5c6675;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.terrain-cell:hover {
+  border-color: #8bb6ff;
+  background: linear-gradient(180deg, #ffffff 0%, #eaf2ff 100%);
+  transform: translateY(-1px);
+}
+
+.terrain-cell.selected {
+  border-color: #2f7cff;
+  box-shadow: 0 0 0 2px rgba(47, 124, 255, 0.24);
+  background: linear-gradient(180deg, #f5f9ff 0%, #dce9ff 100%);
+  color: #1b5fd3;
+}
+
+.terrain-cell-row-tag {
+  position: absolute;
+  left: 5px;
+  top: 4px;
+  font-size: 9px;
+  color: #8791a2;
+  line-height: 1;
+}
+
+.terrain-cell-column-tag {
+  position: absolute;
+  right: 5px;
+  bottom: 4px;
+  font-size: 9px;
+  color: #8791a2;
+  line-height: 1;
+}
+
+.terrain-cell-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #495568;
+}
+
+.terrain-context-menu {
+  position: fixed;
+  z-index: 1200;
+  width: 198px;
+  border-radius: 10px;
+  border: 1px solid #d6deeb;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(26, 38, 60, 0.18);
+  padding: 6px;
+}
+
+.terrain-context-title {
+  font-size: 12px;
+  color: #5f687a;
+  padding: 6px 8px 7px;
+}
+
+.terrain-context-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  border-radius: 8px;
+  padding: 8px 9px;
+  font-size: 12px;
+  color: #2c3443;
+  cursor: pointer;
+}
+
+.terrain-context-item:hover {
+  background: #f3f7ff;
+}
+
+@media (max-width: 900px) {
+  .terrain-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .terrain-grid-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .terrain-cell {
+    width: 52px;
+    height: 52px;
+  }
+}

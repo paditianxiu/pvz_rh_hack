@@ -500,6 +500,26 @@ namespace ipc {
 						}
 
 						return RpcValue::FromBool(board_runtime::GetFreeCD());
+				}
+				},
+				{
+					"StartNextRound",
+					[](const std::vector<RpcValue>& args) -> RpcValue {
+						if (!args.empty()) {
+							throw std::runtime_error("StartNextRound 需要 0 个参数");
+						}
+
+						return RpcValue::FromBool(board_runtime::StartNextRound());
+					}
+				},
+				{
+					"GetBoardFields",
+					[](const std::vector<RpcValue>& args) -> RpcValue {
+						if (!args.empty()) {
+							throw std::runtime_error("GetBoardFields 需要 0 个参数");
+						}
+
+						return RpcValue::FromString(board_runtime::GetBoardFieldsJson());
 					}
 				},
 				{
@@ -524,6 +544,32 @@ namespace ipc {
 						return RpcValue::FromInt32(sunValue);
 					}
 				},
+				{
+					"CreateFireLine",
+					[](const std::vector<RpcValue>& args) -> RpcValue {
+						if (args.size() != 1) {
+							throw std::runtime_error("CreateFireLine 需要 1 个参数");
+						}
+
+						const int32_t fireRow = ToInt32(args[0]);
+						board_runtime::CreateFireLine(fireRow);
+						return RpcValue::FromInt32(fireRow);
+					}
+				},
+				{
+					"SetPit",
+					[](const std::vector<RpcValue>& args) -> RpcValue {
+						if (args.size() != 2) {
+							throw std::runtime_error("SetPit 需要 2 个参数");
+						}
+
+						const int32_t theColumn = ToInt32(args[0]);
+						const int32_t theRow = ToInt32(args[1]);
+						board_runtime::SetPit(theColumn, theRow);
+						return RpcValue::FromInt32(0);
+					}
+				},
+
 				{
 					"GetSun",
 					[](const std::vector<RpcValue>& args) -> RpcValue {

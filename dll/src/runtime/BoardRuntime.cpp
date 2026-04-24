@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <format>
 #include <mutex>
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include "../../Console.hpp"
@@ -29,6 +31,196 @@ namespace board_runtime {
 		MethodHook_t g_originalBoardStart = nullptr;
 		MethodHook_t g_originalBoardOnDestroy = nullptr;
 		MethodHook_t g_originalMouseLeftClickWithSomeThing = nullptr;
+
+		std::string EscapeJsonString(std::string_view text) {
+			std::string escaped;
+			escaped.reserve(text.size() + 8);
+			for (const unsigned char ch : text) {
+				switch (ch) {
+				case '\"':
+					escaped.append("\\\"");
+					break;
+				case '\\':
+					escaped.append("\\\\");
+					break;
+				case '\b':
+					escaped.append("\\b");
+					break;
+				case '\f':
+					escaped.append("\\f");
+					break;
+				case '\n':
+					escaped.append("\\n");
+					break;
+				case '\r':
+					escaped.append("\\r");
+					break;
+				case '\t':
+					escaped.append("\\t");
+					break;
+				default:
+					if (ch < 0x20) {
+						escaped.append(std::format("\\u{:04X}", static_cast<uint32_t>(ch)));
+					}
+					else {
+						escaped.push_back(static_cast<char>(ch));
+					}
+					break;
+				}
+			}
+			return escaped;
+		}
+
+		template <typename T>
+		bool TryReadFieldValue(const UnityResolve::Field* field, void* boardInstance, T& outValue) {
+			if (!field) {
+				return false;
+			}
+
+			try {
+				if (field->static_field) {
+					field->GetStaticValue(&outValue);
+					return true;
+				}
+
+				if (!boardInstance || field->offset < 0) {
+					return false;
+				}
+
+				outValue = *reinterpret_cast<T*>(reinterpret_cast<std::uintptr_t>(boardInstance) + static_cast<std::uintptr_t>(field->offset));
+				return true;
+			}
+			catch (...) {
+				return false;
+			}
+		}
+
+		std::string SerializeBoardFieldValueAsJson(const UnityResolve::Field* field, void* boardInstance) {
+			if (!field || !field->type) {
+				return "null";
+			}
+
+			const std::string& typeName = field->type->name;
+
+			if (typeName == "System.Boolean") {
+				bool value = false;
+				if (TryReadFieldValue(field, boardInstance, value)) {
+					return value ? "true" : "false";
+				}
+				return "null";
+			}
+
+			if (typeName == "System.Int32") {
+				int32_t value = 0;
+				if (TryReadFieldValue(field, boardInstance, value)) {
+					return std::to_string(value);
+				}
+				return "null";
+			}
+
+			if (typeName == "System.UInt32") {
+				uint32_t value = 0;
+				if (TryReadFieldValue(field, boardInstance, value)) {
+					return std::to_string(value);
+				}
+				return "null";
+			}
+
+			if (typeName == "System.Int64") {
+				int64_t value = 0;
+				if (TryReadFieldValue(field, boardInstance, value)) {
+					return std::to_string(value);
+				}
+				return "null";
+			}
+
+			if (typeName == "System.UInt64") {
+				uint64_t value = 0;
+				if (TryReadFieldValue(field, boardInstance, value)) {
+					return std::to_string(value);
+				}
+				return "null";
+			}
+
+			if (typeName == "System.Single") {
+				float value = 0.0f;
+				if (TryReadFieldValue(field, boardInstance, value)) {
+					return std::format("{:.6f}", value);
+				}
+				return "null";
+			}
+
+			if (typeName == "System.Double") {
+				double value = 0.0;
+				if (TryReadFieldValue(field, boardInstance, value)) {
+					return std::format("{:.6f}", value);
+				}
+				return "null";
+			}
+
+			if (typeName == "System.String") {
+				UnityResolve::UnityType::String* value = nullptr;
+				if (TryReadFieldValue(field, boardInstance, value) && value) {
+					return std::format("\"{}\"", EscapeJsonString(value->ToString()));
+				}
+				return "null";
+			}
+
+			if (typeName == "UnityEngine.Vector2") {
+				UnityResolve::UnityType::Vector2 value{};
+				if (TryReadFieldValue(field, boardInstance, value)) {
+					return std::format("{{\"x\":{:.6f},\"y\":{:.6f}}}", value.x, value.y);
+				}
+				return "null";
+			}
+
+			if (typeName == "UnityEngine.Vector3") {
+				UnityResolve::UnityType::Vector3 value{};
+				if (TryReadFieldValue(field, boardInstance, value)) {
+					return std::format("{{\"x\":{:.6f},\"y\":{:.6f},\"z\":{:.6f}}}", value.x, value.y, value.z);
+				}
+				return "null";
+			}
+
+			if (typeName == "UnityEngine.Vector4") {
+				UnityResolve::UnityType::Vector4 value{};
+				if (TryReadFieldValue(field, boardInstance, value)) {
+					return std::format("{{\"x\":{:.6f},\"y\":{:.6f},\"z\":{:.6f},\"w\":{:.6f}}}", value.x, value.y, value.z, value.w);
+				}
+				return "null";
+			}
+
+			if (typeName == "UnityEngine.Quaternion") {
+				UnityResolve::UnityType::Quaternion value{};
+				if (TryReadFieldValue(field, boardInstance, value)) {
+					return std::format("{{\"x\":{:.6f},\"y\":{:.6f},\"z\":{:.6f},\"w\":{:.6f}}}", value.x, value.y, value.z, value.w);
+				}
+				return "null";
+			}
+
+			if (typeName == "UnityEngine.Color") {
+				UnityResolve::UnityType::Color value(0.0f, 0.0f, 0.0f, 0.0f);
+				if (TryReadFieldValue(field, boardInstance, value)) {
+					return std::format("{{\"r\":{:.6f},\"g\":{:.6f},\"b\":{:.6f},\"a\":{:.6f}}}", value.r, value.g, value.b, value.a);
+				}
+				return "null";
+			}
+
+			if (typeName == "UnityEngine.Rect") {
+				UnityResolve::UnityType::Rect value{};
+				if (TryReadFieldValue(field, boardInstance, value)) {
+					return std::format("{{\"x\":{:.6f},\"y\":{:.6f},\"width\":{:.6f},\"height\":{:.6f}}}", value.fX, value.fY, value.fWidth, value.fHeight);
+				}
+				return "null";
+			}
+
+			std::uintptr_t rawPointer = 0;
+			if (TryReadFieldValue(field, boardInstance, rawPointer)) {
+				return std::format("\"0x{:X}\"", rawPointer);
+			}
+
+			return "null";
+		}
 
 		bool SetAllCardUICooldown(float cooldown) {
 			try {
@@ -353,6 +545,117 @@ namespace board_runtime {
 		SetBoardBoolField("rightPutPot", enabled);
 	}
 
+	void CreateFireLine(int theFireRow) {
+		try {
+			void* boardInstance = GetBoardInstance();
+			if (!boardInstance) {
+				LOG_ERROR("CreateFireLine 未找到 Board 实例！");
+				return;
+			}
+
+			const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
+			if (!assembly) {
+				LOG_ERROR("CreateFireLine 未找到程序集！");
+				return;
+			}
+
+			const auto boardClass = assembly->Get("Board");
+			if (!boardClass) {
+				LOG_ERROR("CreateFireLine 未找到 Board 类！");
+				return;
+			}
+
+			const auto createFireLineMethod = boardClass->Get<UnityResolve::Method>("SetRedLine");
+			if (!createFireLineMethod) {
+				LOG_ERROR("CreateFireLine 未找到 Board::CreateFireLine 方法！");
+				return;
+			}
+
+			createFireLineMethod->Invoke<void>(
+				boardInstance,
+				theFireRow
+			);
+		}
+		catch (const std::exception& e) {
+			LOG_ERROR(std::format("CreateFireLine 异常: {}", e.what()).c_str());
+		}
+	}
+
+
+	bool StartNextRound() {
+		try {
+			void* boardInstance = GetBoardInstance();
+			if (!boardInstance) {
+				LOG_ERROR("StartNextRound 未找到 Board 实例！");
+				return false;
+			}
+
+			const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
+			if (!assembly) {
+				LOG_ERROR("StartNextRound 未找到程序集！");
+				return false;
+			}
+
+			const auto boardClass = assembly->Get("Board");
+			if (!boardClass) {
+				LOG_ERROR("StartNextRound 未找到 Board 类！");
+				return false;
+			}
+
+			const auto methoed = boardClass->Get<UnityResolve::Method>("StartNextRound");
+			if (!methoed) {
+				LOG_ERROR("StartNextRound 未找到 Board::StartNextRound 方法！");
+				return false;
+			}
+
+			methoed->Invoke<void>(
+				boardInstance
+			);
+			return true;
+		}
+		catch (const std::exception& e) {
+			LOG_ERROR(std::format("StartNextRound 异常: {}", e.what()).c_str());
+			return false;
+		}
+	}
+
+	void SetPit(int theColumn, int theRow) {
+		try {
+			void* boardInstance = GetBoardInstance();
+			if (!boardInstance) {
+				LOG_ERROR("SetPit 未找到 Board 实例！");
+				return;
+			}
+
+			const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
+			if (!assembly) {
+				LOG_ERROR("SetPit 未找到程序集！");
+				return;
+			}
+
+			const auto boardClass = assembly->Get("Board");
+			if (!boardClass) {
+				LOG_ERROR("SetPit 未找到 Board 类！");
+				return;
+			}
+
+			const auto methoed = boardClass->Get<UnityResolve::Method>("SetPit");
+			if (!methoed) {
+				LOG_ERROR("SetPit 未找到 Board::SetPit 方法！");
+				return;
+			}
+
+			methoed->Invoke<void>(
+				boardInstance,
+				theColumn,
+				theRow
+			);
+		}
+		catch (const std::exception& e) {
+			LOG_ERROR(std::format("SetPit 异常: {}", e.what()).c_str());
+		}
+	}
+
 	bool GetFreeCD() {
 		try {
 			void* boardInstance = GetBoardInstance();
@@ -381,6 +684,69 @@ namespace board_runtime {
 		}
 
 		return false;
+	}
+
+	std::string GetBoardFieldsJson() {
+		try {
+			const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
+			if (!assembly) {
+				LOG_ERROR("GetBoardFieldsJson 未找到程序集！");
+				return "{\"Class\":\"Board\",\"Error\":\"assembly_not_found\",\"Fields\":[]}";
+			}
+
+			const auto boardClass = assembly->Get("Board");
+			if (!boardClass) {
+				LOG_ERROR("GetBoardFieldsJson 未找到 Board 类！");
+				return "{\"Class\":\"Board\",\"Error\":\"board_class_not_found\",\"Fields\":[]}";
+			}
+
+			void* boardInstance = GetBoardInstance();
+			if (!boardInstance) {
+				LOG_WARNING("GetBoardFieldsJson 未找到 Board 实例，仅导出静态字段值");
+			}
+
+			std::string json;
+			json.reserve(boardClass->fields.size() * 112 + 96);
+			json.push_back('{');
+			json.append(std::format("\"Class\":\"{}\",", EscapeJsonString(boardClass->name)));
+			if (boardInstance) {
+				json.append(std::format("\"Instance\":\"0x{:X}\",", reinterpret_cast<std::uintptr_t>(boardInstance)));
+			}
+			else {
+				json.append("\"Instance\":null,");
+			}
+			json.append("\"Fields\":[");
+
+			bool firstField = true;
+			for (const auto field : boardClass->fields) {
+				if (!field) {
+					continue;
+				}
+
+				if (!firstField) {
+					json.push_back(',');
+				}
+
+				const std::string typeName = field->type ? field->type->name : "Unknown";
+				const std::string valueJson = SerializeBoardFieldValueAsJson(field, boardInstance);
+				json.append(std::format(
+					"{{\"Name\":\"{}\",\"Type\":\"{}\",\"Static\":{},\"Offset\":{},\"Value\":{}}}",
+					EscapeJsonString(field->name),
+					EscapeJsonString(typeName),
+					field->static_field ? "true" : "false",
+					field->offset,
+					valueJson
+				));
+				firstField = false;
+			}
+
+			json.append("]}");
+			return json;
+		}
+		catch (const std::exception& e) {
+			LOG_ERROR(std::format("GetBoardFieldsJson 异常: {}", e.what()).c_str());
+			return std::format("{{\"Class\":\"Board\",\"Error\":\"{}\",\"Fields\":[]}}", EscapeJsonString(e.what()));
+		}
 	}
 
 	int GetBoardWave() {
