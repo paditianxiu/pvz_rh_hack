@@ -150,12 +150,15 @@
     <ClInclude Include="src\BoardRuntime.hpp" />
     <ClInclude Include="src\Bootstrap.hpp" />
     <ClInclude Include="src\PipeServer.hpp" />
+    <ClInclude Include="src\runtime\common\RuntimeHookCommon.hpp" />
+    <ClInclude Include="src\runtime\ZombieRuntimeInternal.hpp" />
     <ClInclude Include="UnityResolve.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\BoardRuntime.cpp" />
+    <ClCompile Include="src\runtime\BoardRuntime.cpp" />
     <ClCompile Include="src\Bootstrap.cpp" />
     <ClCompile Include="src\PipeServer.cpp" />
+    <ClCompile Include="src\runtime\ZombieRuntime.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

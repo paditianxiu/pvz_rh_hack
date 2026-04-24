@@ -5,9 +5,18 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="源文件\runtime">
+      <UniqueIdentifier>{F32FA9EA-1D61-4A35-8D35-A78AEEAB0D1C}</UniqueIdentifier>
+    </Filter>
     <Filter Include="头文件">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="头文件\runtime">
+      <UniqueIdentifier>{6BE962DF-4C13-4A13-B568-9D2C639B9621}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\runtime\common">
+      <UniqueIdentifier>{F2E3D8D6-6778-4E2C-9F89-F0A3D0CF2D80}</UniqueIdentifier>
     </Filter>
     <Filter Include="资源文件">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
@@ -36,16 +45,25 @@
     <ClInclude Include="Console.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="src\runtime\ZombieRuntimeInternal.hpp">
+      <Filter>头文件\runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="src\runtime\common\RuntimeHookCommon.hpp">
+      <Filter>头文件\runtime\common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\BoardRuntime.cpp">
-      <Filter>源文件</Filter>
+    <ClCompile Include="src\runtime\BoardRuntime.cpp">
+      <Filter>源文件\runtime</Filter>
     </ClCompile>
     <ClCompile Include="src\Bootstrap.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="src\PipeServer.cpp">
       <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\runtime\ZombieRuntime.cpp">
+      <Filter>源文件\runtime</Filter>
     </ClCompile>
     <ClCompile Include="dllmain.cpp">
       <Filter>源文件</Filter>
