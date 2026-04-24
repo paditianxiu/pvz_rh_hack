@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <format>
 #include <mutex>
+#include <atomic>
 #include <unordered_set>
 #include <vector>
 
@@ -23,18 +24,23 @@ namespace board_runtime {
 		std::unordered_set<void*> g_zombieInstances;
 		std::mutex g_zombieMutex;
 		bool g_hooksInstalled = false;
+		std::atomic_bool g_freeCDAutoRefreshEnabled = false;
+		constexpr float kFreeCDCooldownValue = 99999.0f;
 
 		MethodHook_t g_originalBoardAwake = nullptr;
 		MethodHook_t g_originalBoardStart = nullptr;
 		MethodHook_t g_originalBoardOnDestroy = nullptr;
 		MethodHook_t g_originalZombieFixedUpdate = nullptr;
 		MethodHook_t g_originalZombieOnDestroy = nullptr;
+		MethodHook_t g_originalMouseLeftClickWithSomeThing = nullptr;
 		GetTransform_t g_getTransform = nullptr;
 		GetPosition_t g_getPosition = nullptr;
 		UnityResolve::Method* g_getEntityRowMethod = nullptr;
 		UnityResolve::Method* g_getEntityColumnMethod = nullptr;
 		UnityResolve::Class* g_zombieClass = nullptr;
 		UnityResolve::Field* g_zombieTypeField = nullptr;
+
+		bool SetAllCardUICooldown(float cooldown);
 
 		void CacheBoardInstance(void* instance) {
 			std::lock_guard<std::mutex> lock(g_boardMutex);
@@ -109,6 +115,16 @@ namespace board_runtime {
 			}
 		}
 
+		void HookedMouseLeftClickWithSomeThing(void* _this) {
+			if (g_originalMouseLeftClickWithSomeThing) {
+				g_originalMouseLeftClickWithSomeThing(_this);
+			}
+
+			if (g_freeCDAutoRefreshEnabled.load(std::memory_order_acquire)) {
+				SetAllCardUICooldown(kFreeCDCooldownValue);
+			}
+		}
+
 		bool SetBoardBoolField(const char* fieldName, bool enabled) {
 			try {
 				void* boardInstance = board_runtime::GetBoardInstance();
@@ -141,6 +157,149 @@ namespace board_runtime {
 			}
 			catch (const std::exception& e) {
 				LOG_ERROR(std::format("{} 异常: {}", fieldName, e.what()).c_str());
+				return false;
+			}
+		}
+
+		UnityResolve::Field* GetBoardTagField(UnityResolve::Class* boardClass) {
+			if (!boardClass) {
+				return nullptr;
+			}
+
+			if (const auto boardTagField = boardClass->Get<UnityResolve::Field>("BoardTag")) {
+				return boardTagField;
+			}
+
+			return boardClass->Get<UnityResolve::Field>("boardTag");
+		}
+
+		UnityResolve::Class* ResolveBoardTagClass(UnityResolve::Assembly* assembly) {
+			if (!assembly) {
+				return nullptr;
+			}
+
+			if (const auto boardTagClass = assembly->Get("BoardTag")) {
+				return boardTagClass;
+			}
+
+			for (const auto klass : assembly->classes) {
+				if (!klass) {
+					continue;
+				}
+
+				if (klass->Get<UnityResolve::Field>("pvpScaryPot")) {
+					return klass;
+				}
+			}
+
+			return nullptr;
+		}
+
+		bool SetBoardTagPvpScaryPot(bool enabled) {
+			try {
+				void* boardInstance = board_runtime::GetBoardInstance();
+				if (!boardInstance) {
+					LOG_ERROR("未找到 Board 实例！");
+					return false;
+				}
+
+				const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
+				if (!assembly) {
+					LOG_ERROR("未找到程序集！");
+					return false;
+				}
+
+				const auto boardClass = assembly->Get("Board");
+				if (!boardClass) {
+					LOG_ERROR("未找到 Board 类！");
+					return false;
+				}
+
+				const auto boardTagField = GetBoardTagField(boardClass);
+				if (!boardTagField) {
+					LOG_ERROR("未找到 BoardTag 字段！");
+					return false;
+				}
+
+				const auto boardTagClass = ResolveBoardTagClass(assembly);
+				if (!boardTagClass) {
+					LOG_ERROR("未找到 BoardTag 类！");
+					return false;
+				}
+
+				const auto pvpScaryPotField = boardTagClass->Get<UnityResolve::Field>("pvpScaryPot");
+				if (!pvpScaryPotField) {
+					LOG_ERROR("未找到 BoardTag.pvpScaryPot 字段！");
+					return false;
+				}
+
+				auto* const boardTagInstance = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(boardInstance) + boardTagField->offset);
+				boardTagClass->SetValue(boardTagInstance, pvpScaryPotField->name, enabled);
+				LOG_INFO(std::format("BoardTag.pvpScaryPot 已设置为: {}，实例: 0x{:X}", enabled, reinterpret_cast<uintptr_t>(boardInstance)).c_str());
+
+				const auto isScaryPotField = boardTagClass->Get<UnityResolve::Field>("isScaryPot");
+				if (!isScaryPotField) {
+					LOG_ERROR("未找到 BoardTag.isScaryPot 字段！");
+					return false;
+				}
+
+				boardTagClass->SetValue(boardTagInstance, isScaryPotField->name, enabled);
+				LOG_INFO(std::format("BoardTag.isScaryPot 已设置为: {}，实例: 0x{:X}", enabled, reinterpret_cast<uintptr_t>(boardInstance)).c_str());
+
+
+				return true;
+			}
+			catch (const std::exception& e) {
+				LOG_ERROR(std::format("设置 BoardTag.pvpScaryPot 异常: {}", e.what()).c_str());
+				return false;
+			}
+		}
+
+		bool SetAllCardUICooldown(float cooldown) {
+			try {
+				const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
+				if (!assembly) {
+					LOG_ERROR("未找到程序集！");
+					return false;
+				}
+
+				const auto cardUIClass = assembly->Get("CardUI");
+				if (!cardUIClass) {
+					LOG_ERROR("未找到 CardUI 类！");
+					return false;
+				}
+
+				constexpr unsigned int kCardUICDOffset = 0x44;
+				unsigned int cdOffset = kCardUICDOffset;
+				if (const auto cdField = cardUIClass->Get<UnityResolve::Field>("CD")) {
+					if (cdField->offset > 0) {
+						cdOffset = static_cast<unsigned int>(cdField->offset);
+					}
+				}
+				else {
+					LOG_WARNING("未找到 CardUI.CD 字段，回退使用偏移 0x44");
+				}
+
+				const auto cardUIInstances = cardUIClass->FindObjectsByType<void*>();
+				if (cardUIInstances.empty()) {
+					LOG_WARNING("未找到 CardUI 实例！");
+					return false;
+				}
+
+				size_t updatedCount = 0;
+				for (auto cardUIInstance : cardUIInstances) {
+					if (!cardUIInstance) {
+						continue;
+					}
+
+					cardUIClass->SetValue<float>(cardUIInstance, cdOffset, cooldown);
+					++updatedCount;
+				}
+
+				return updatedCount > 0;
+			}
+			catch (const std::exception& e) {
+				LOG_ERROR(std::format("设置 CardUI.CD 异常: {}", e.what()).c_str());
 				return false;
 			}
 		}
@@ -196,6 +355,7 @@ namespace board_runtime {
 			g_originalBoardOnDestroy = nullptr;
 			g_originalZombieFixedUpdate = nullptr;
 			g_originalZombieOnDestroy = nullptr;
+			g_originalMouseLeftClickWithSomeThing = nullptr;
 			g_getTransform = nullptr;
 			g_getPosition = nullptr;
 			g_getEntityRowMethod = nullptr;
@@ -203,6 +363,7 @@ namespace board_runtime {
 			g_zombieClass = nullptr;
 			g_zombieTypeField = nullptr;
 			g_hooksInstalled = false;
+			g_freeCDAutoRefreshEnabled.store(false, std::memory_order_release);
 		}
 	}
 
@@ -225,6 +386,7 @@ namespace board_runtime {
 				return false;
 			}
 			const auto zombieClass = assembly->Get("Zombie");
+			const auto mouseClass = assembly->Get("Mouse");
 
 			DetourTransactionBegin();
 			DetourUpdateThread(GetCurrentThread());
@@ -275,6 +437,7 @@ namespace board_runtime {
 			hookSuccess = attachHook(boardClass, "Board", "OnDestroy", g_originalBoardOnDestroy, HookedBoardOnDestroy, false) && hookSuccess;
 			hookSuccess = attachHook(zombieClass, "Zombie", "FixedUpdate", g_originalZombieFixedUpdate, HookedZombieFixedUpdate, false) && hookSuccess;
 			hookSuccess = attachHook(zombieClass, "Zombie", "OnDestroy", g_originalZombieOnDestroy, HookedZombieOnDestroy, false) && hookSuccess;
+			hookSuccess = attachHook(mouseClass, "Mouse", "LeftClickWithSomeThing", g_originalMouseLeftClickWithSomeThing, HookedMouseLeftClickWithSomeThing, false) && hookSuccess;
 
 			const auto result = DetourTransactionCommit();
 			if (result != NO_ERROR) {
@@ -322,6 +485,9 @@ namespace board_runtime {
 		}
 		if (g_originalZombieOnDestroy) {
 			DetourDetach(&(PVOID&)g_originalZombieOnDestroy, HookedZombieOnDestroy);
+		}
+		if (g_originalMouseLeftClickWithSomeThing) {
+			DetourDetach(&(PVOID&)g_originalMouseLeftClickWithSomeThing, HookedMouseLeftClickWithSomeThing);
 		}
 
 		DetourTransactionCommit();
@@ -417,7 +583,11 @@ namespace board_runtime {
 	}
 
 	void SetFreeCD(bool enabled) {
-		SetBoardBoolField("freeCD", enabled);
+		g_freeCDAutoRefreshEnabled.store(enabled, std::memory_order_release);
+
+		if (enabled) {
+			SetAllCardUICooldown(kFreeCDCooldownValue);
+		}
 	}
 
 
@@ -426,6 +596,7 @@ namespace board_runtime {
 	}
 
 	void SetRightPutPot(bool enabled) {
+		SetBoardTagPvpScaryPot(enabled);
 		SetBoardBoolField("rightPutPot", enabled);
 	}
 

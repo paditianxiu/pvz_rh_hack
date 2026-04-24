@@ -47,12 +47,7 @@ const cheatToggleConfigs: readonly CheatToggleConfig[] = [
     key: 'randomCard',
     label: '随机卡槽',
     invokeMethod: 'SetRandomCard',
-  },
-  {
-    key: 'rightPutPot',
-    label: '右键放罐子',
-    invokeMethod: 'SetRightPutPot',
-  },
+  }
 ];
 
 const initialCheatToggleState: Record<string, boolean> = {
@@ -85,7 +80,7 @@ function App() {
   const location = useLocation();
   const gameName = 'PlantsVsZombiesRH.exe';
   const defaultSunValue = 9999;
-  const isDebug = true;
+  const isDebug = false;
   const dllPath = isDebug ? 'D:/Application/Code/Wails/pvz_rh_hack/payload/MyDLL.dll' : '';
 
   const navItems: NavItem[] = [

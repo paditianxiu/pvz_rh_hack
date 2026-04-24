@@ -186,6 +186,7 @@ public:
         template <typename RType>
         auto SetValue(void* obj, unsigned int offset, RType value) -> RType {
             *reinterpret_cast<RType*>(reinterpret_cast<uintptr_t>(obj) + offset) = value;
+            return value;
         }
 
         // UnityType::CsType*
