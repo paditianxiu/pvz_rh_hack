@@ -372,7 +372,7 @@ namespace ipc {
 				if (end == text.c_str() || *end != '\0') {
 					throw std::runtime_error(std::format("字符串不是有效整数: {}", value.stringValue));
 				}
-				if (parsed < (std::numeric_limits<int32_t>::min)() || parsed > (std::numeric_limits<int32_t>::max)()) {
+				if (parsed < (std::numeric_limits<int32_t>::min)() || parsed >(std::numeric_limits<int32_t>::max)()) {
 					throw std::runtime_error(std::format("参数超出 int32 范围: {}", value.stringValue));
 				}
 
@@ -490,7 +490,8 @@ namespace ipc {
 						const bool enabled = ToBool(args[0]);
 						board_runtime::SetRightPutPot(enabled);
 						return RpcValue::FromBool(enabled);
-					}
+						
+				}
 				},
 				{
 					"GetFreeCD",
@@ -500,7 +501,7 @@ namespace ipc {
 						}
 
 						return RpcValue::FromBool(board_runtime::GetFreeCD());
-				}
+				},
 				},
 				{
 					"StartNextRound",
@@ -520,7 +521,7 @@ namespace ipc {
 						}
 
 						return RpcValue::FromString(board_runtime::GetBoardFieldsJson());
-					}
+				}
 				},
 				{
 					"GetZombiePositions",
@@ -530,7 +531,7 @@ namespace ipc {
 						}
 
 						return RpcValue::FromString(SerializeZombieCoordinates());
-					}
+				}
 				},
 				{
 					"SetSun",
@@ -569,7 +570,6 @@ namespace ipc {
 						return RpcValue::FromInt32(0);
 					}
 				},
-
 				{
 					"GetSun",
 					[](const std::vector<RpcValue>& args) -> RpcValue {
@@ -579,6 +579,29 @@ namespace ipc {
 
 						return RpcValue::FromInt32(board_runtime::GetSun());
 					}
+				},
+				{
+					"GetPlantList",
+					[](const std::vector<RpcValue>& args) -> RpcValue {
+						if (!args.empty()) {
+							throw std::runtime_error("CreatePlant 需要 0 个参数");
+						}
+
+						return RpcValue::FromString(board_runtime::GetPlantList());
+					}
+				},
+				{
+					"CreatePlant",
+					[](const std::vector<RpcValue>& args) -> RpcValue {
+							if (args.size() != 3) {
+							throw std::runtime_error("CreatePlant 需要 3 个参数");
+							}
+						const int newColumn = ToInt32(args[0]);
+						const int newRow = ToInt32(args[1]);
+						const int theSeedType = ToInt32(args[2]);
+						board_runtime::CreatePlant(newColumn, newRow, theSeedType);
+						return RpcValue::FromBool(true);
+						}
 				}
 			};
 			return methods;
@@ -592,7 +615,7 @@ namespace ipc {
 					map.emplace(NormalizeFunctionKey(method.name), method.handler);
 				}
 				return map;
-			}();
+				}();
 			return handlers;
 		}
 

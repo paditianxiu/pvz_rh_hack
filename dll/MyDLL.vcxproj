@@ -81,8 +81,9 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;MYDLL_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp23</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -115,8 +116,9 @@
       <PreprocessorDefinitions>_DEBUG;MYDLL_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp23</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -151,6 +153,7 @@
     <ClInclude Include="src\Bootstrap.hpp" />
     <ClInclude Include="src\PipeServer.hpp" />
     <ClInclude Include="src\runtime\common\RuntimeHookCommon.hpp" />
+    <ClInclude Include="src\runtime\test\CreatePlantSetPlantHookTest.hpp" />
     <ClInclude Include="src\runtime\ZombieRuntimeInternal.hpp" />
     <ClInclude Include="UnityResolve.hpp" />
   </ItemGroup>
@@ -158,6 +161,7 @@
     <ClCompile Include="src\runtime\BoardRuntime.cpp" />
     <ClCompile Include="src\Bootstrap.cpp" />
     <ClCompile Include="src\PipeServer.cpp" />
+    <ClCompile Include="src\runtime\test\CreatePlantSetPlantHookTest.cpp" />
     <ClCompile Include="src\runtime\ZombieRuntime.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="pch.cpp">

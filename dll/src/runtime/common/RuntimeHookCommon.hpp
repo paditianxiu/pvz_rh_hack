@@ -1,11 +1,15 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <format>
+#include <vector>
 
 #include "../../../Console.hpp"
 #include "../../../UnityResolve.hpp"
 #include <detours/detours.h>
+
+
 
 namespace board_runtime::common {
 	template <typename MethodHookT>
@@ -51,5 +55,22 @@ namespace board_runtime::common {
 
 		LOG_INFO(std::format("{}::{} 挂钩成功", className, methodName).c_str());
 		return true;
+	}
+
+	template<typename T>
+	std::unordered_map<std::string, T> GetEnumValues(UnityResolve::Class* enumClass) {
+		std::unordered_map<std::string, T> result;
+
+		if (!enumClass) return result;
+
+		for (const auto& field : enumClass->fields) {
+			if (field->static_field) {
+				T value = 0;
+				field->GetStaticValue(&value);
+				result[field->name] = value;
+			}
+		}
+
+		return result;
 	}
 }

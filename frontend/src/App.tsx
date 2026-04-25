@@ -81,7 +81,7 @@ function App() {
   const location = useLocation();
   const gameName = 'PlantsVsZombiesRH.exe';
   const defaultSunValue = 9999;
-  const isDebug = true;
+  const isDebug = false;
   const dllPath = isDebug ? 'D:/Application/Code/Wails/pvz_rh_hack/payload/MyDLL.dll' : '';
 
   const navItems: NavItem[] = [
@@ -295,16 +295,6 @@ function App() {
                             onChange={(value) => setSunValue(value ?? defaultSunValue)}
                           />
                           <Button type="primary" onClick={handleSetSun}>
-                            应用
-                          </Button>
-                        </div>
-                      </SettingRow>
-                      <SettingRow label="测试">
-                        <div className="setting-actions">
-                          <Button type="primary" onClick={async () => {
-                            const raw = await "GetBoardFields".invoke()
-                            console.log(JSON.parse(raw as string))
-                          }}>
                             应用
                           </Button>
                         </div>

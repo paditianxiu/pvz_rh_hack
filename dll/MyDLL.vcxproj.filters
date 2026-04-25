@@ -18,6 +18,12 @@
     <Filter Include="头文件\runtime\common">
       <UniqueIdentifier>{F2E3D8D6-6778-4E2C-9F89-F0A3D0CF2D80}</UniqueIdentifier>
     </Filter>
+    <Filter Include="头文件\runtime\test">
+      <UniqueIdentifier>{8A83C194-BA9C-47A2-9FA4-0A90ECF9404A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\runtime\test">
+      <UniqueIdentifier>{0F091F53-58B9-4BD1-B4A9-6A6D0A1E37A4}</UniqueIdentifier>
+    </Filter>
     <Filter Include="资源文件">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
@@ -51,6 +57,9 @@
     <ClInclude Include="src\runtime\common\RuntimeHookCommon.hpp">
       <Filter>头文件\runtime\common</Filter>
     </ClInclude>
+    <ClInclude Include="src\runtime\test\CreatePlantSetPlantHookTest.hpp">
+      <Filter>头文件\runtime\test</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\runtime\BoardRuntime.cpp">
@@ -64,6 +73,9 @@
     </ClCompile>
     <ClCompile Include="src\runtime\ZombieRuntime.cpp">
       <Filter>源文件\runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="src\runtime\test\CreatePlantSetPlantHookTest.cpp">
+      <Filter>源文件\runtime\test</Filter>
     </ClCompile>
     <ClCompile Include="dllmain.cpp">
       <Filter>源文件</Filter>

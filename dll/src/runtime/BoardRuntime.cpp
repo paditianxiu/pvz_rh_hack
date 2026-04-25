@@ -1,10 +1,13 @@
 #include "../../pch.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <format>
 #include <mutex>
+#include <queue>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -15,22 +18,24 @@
 
 #include "../BoardRuntime.hpp"
 #include "common/RuntimeHookCommon.hpp"
+#include "test/CreatePlantSetPlantHookTest.hpp"
 #include "ZombieRuntimeInternal.hpp"
 
 namespace board_runtime {
 	namespace {
 		using MethodHook_t = void (*)(void* _this);
+		using Update_t = void(UNITY_CALLING_CONVENTION*)(void* _this);
 
-		void* g_boardInstance = nullptr;
 		std::mutex g_boardMutex;
+		std::mutex g_mainThreadMutex;
+		std::queue<std::function<void()>> g_mainThreadTasks;
 		bool g_hooksInstalled = false;
 		std::atomic_bool g_freeCDAutoRefreshEnabled = false;
+		std::atomic_bool g_mainThreadDispatcherInstalled = false;
 		constexpr float kFreeCDCooldownValue = 99999.0f;
 
-		MethodHook_t g_originalBoardAwake = nullptr;
-		MethodHook_t g_originalBoardStart = nullptr;
-		MethodHook_t g_originalBoardOnDestroy = nullptr;
 		MethodHook_t g_originalMouseLeftClickWithSomeThing = nullptr;
+		Update_t g_originalBoardUpdate = nullptr;
 
 		std::string EscapeJsonString(std::string_view text) {
 			std::string escaped;
@@ -307,41 +312,33 @@ namespace board_runtime {
 			}
 		}
 
-		void HookedBoardAwake(void* _this) {
-			{
-				std::lock_guard<std::mutex> lock(g_boardMutex);
-				g_boardInstance = _this;
-			}
-
-			LOG_INFO(std::format("[钩子] 已调用 Board::Awake，this: 0x{:X}", reinterpret_cast<uintptr_t>(_this)).c_str());
-			if (g_originalBoardAwake) {
-				g_originalBoardAwake(_this);
-			}
+		void RunOnMainThread(std::function<void()> fn) {
+			std::lock_guard<std::mutex> lock(g_mainThreadMutex);
+			g_mainThreadTasks.push(std::move(fn));
 		}
 
-		void HookedBoardStart(void* _this) {
-			{
-				std::lock_guard<std::mutex> lock(g_boardMutex);
-				g_boardInstance = _this;
+		void UNITY_CALLING_CONVENTION HookedBoardUpdate(void* _this) {
+			if (g_originalBoardUpdate) {
+				g_originalBoardUpdate(_this);
 			}
 
-			LOG_INFO(std::format("[钩子] 已调用 Board::Start，this: 0x{:X}", reinterpret_cast<uintptr_t>(_this)).c_str());
-			if (g_originalBoardStart) {
-				g_originalBoardStart(_this);
-			}
-		}
-
-		void HookedBoardOnDestroy(void* _this) {
-			LOG_INFO(std::format("[钩子] 已调用 Board::OnDestroy，this: 0x{:X}", reinterpret_cast<uintptr_t>(_this)).c_str());
+			std::queue<std::function<void()>> tasks;
 			{
-				std::lock_guard<std::mutex> lock(g_boardMutex);
-				if (g_boardInstance == _this) {
-					g_boardInstance = nullptr;
+				std::lock_guard<std::mutex> lock(g_mainThreadMutex);
+				std::swap(tasks, g_mainThreadTasks);
+			}
+
+			while (!tasks.empty()) {
+				try {
+					tasks.front()();
 				}
-			}
-
-			if (g_originalBoardOnDestroy) {
-				g_originalBoardOnDestroy(_this);
+				catch (const std::exception& e) {
+					LOG_ERROR(std::format("MainThread Task Exception: {}", e.what()).c_str());
+				}
+				catch (...) {
+					LOG_ERROR("MainThread Task Unknown Exception");
+				}
+				tasks.pop();
 			}
 		}
 
@@ -357,16 +354,16 @@ namespace board_runtime {
 
 		void ResetBoardRuntimeState() {
 			{
-				std::lock_guard<std::mutex> lock(g_boardMutex);
-				g_boardInstance = nullptr;
+				std::lock_guard<std::mutex> lock(g_mainThreadMutex);
+				std::queue<std::function<void()>> emptyTasks;
+				std::swap(g_mainThreadTasks, emptyTasks);
 			}
 
-			g_originalBoardAwake = nullptr;
-			g_originalBoardStart = nullptr;
-			g_originalBoardOnDestroy = nullptr;
+			g_originalBoardUpdate = nullptr;
 			g_originalMouseLeftClickWithSomeThing = nullptr;
 			g_hooksInstalled = false;
 			g_freeCDAutoRefreshEnabled.store(false, std::memory_order_release);
+			g_mainThreadDispatcherInstalled.store(false, std::memory_order_release);
 		}
 	}
 
@@ -394,9 +391,15 @@ namespace board_runtime {
 			DetourUpdateThread(GetCurrentThread());
 
 			bool hookSuccess = true;
-			hookSuccess = common::AttachMethodHook(boardClass, "Board", "Awake", g_originalBoardAwake, HookedBoardAwake, true) && hookSuccess;
-			hookSuccess = common::AttachMethodHook(boardClass, "Board", "Start", g_originalBoardStart, HookedBoardStart, true) && hookSuccess;
-			hookSuccess = common::AttachMethodHook(boardClass, "Board", "OnDestroy", g_originalBoardOnDestroy, HookedBoardOnDestroy, false) && hookSuccess;
+			const bool mainThreadDispatcherHooked = common::AttachMethodHook(
+				boardClass,
+				"Board",
+				"Update",
+				g_originalBoardUpdate,
+				HookedBoardUpdate,
+				true
+			);
+			hookSuccess = mainThreadDispatcherHooked && hookSuccess;
 			hookSuccess = common::AttachMethodHook(mouseClass, "Mouse", "LeftClickWithSomeThing", g_originalMouseLeftClickWithSomeThing, HookedMouseLeftClickWithSomeThing, false) && hookSuccess;
 
 			const auto result = DetourTransactionCommit();
@@ -404,11 +407,19 @@ namespace board_runtime {
 				LOG_ERROR(std::format("提交 Board Detours 事务失败: {}", result).c_str());
 				return false;
 			}
+			g_mainThreadDispatcherInstalled.store(mainThreadDispatcherHooked, std::memory_order_release);
+			if (!mainThreadDispatcherHooked) {
+				LOG_WARNING("MainThread Dispatcher 安装失败，CreatePlant 将回退到当前线程执行");
+			}
 
 			const bool zombieHookInstalled = internal::InstallZombieHooks(assembly);
 			if (!zombieHookInstalled) {
 				LOG_WARNING("Zombie 钩子未安装或部分缺失，继续运行...");
 			}
+			/*const bool createPlantSetPlantHookInstalled = internal::CreatePlantSetPlantHookTest::Install(assembly);
+			if (!createPlantSetPlantHookInstalled) {
+				LOG_WARNING("CreatePlant::SetPlant 测试钩子未安装或部分缺失，继续运行...");
+			}*/
 
 			g_hooksInstalled = true;
 			if (!hookSuccess) {
@@ -426,24 +437,20 @@ namespace board_runtime {
 
 	void UninstallBoardHooks() {
 		if (!g_hooksInstalled) {
+			//internal::CreatePlantSetPlantHookTest::Reset();
 			internal::ResetZombieHooksState();
 			ResetBoardRuntimeState();
 			return;
 		}
 
+		//internal::CreatePlantSetPlantHookTest::Uninstall();
 		internal::UninstallZombieHooks();
 
 		DetourTransactionBegin();
 		DetourUpdateThread(GetCurrentThread());
 
-		if (g_originalBoardAwake) {
-			DetourDetach(&(PVOID&)g_originalBoardAwake, HookedBoardAwake);
-		}
-		if (g_originalBoardStart) {
-			DetourDetach(&(PVOID&)g_originalBoardStart, HookedBoardStart);
-		}
-		if (g_originalBoardOnDestroy) {
-			DetourDetach(&(PVOID&)g_originalBoardOnDestroy, HookedBoardOnDestroy);
+		if (g_originalBoardUpdate) {
+			DetourDetach(&(PVOID&)g_originalBoardUpdate, HookedBoardUpdate);
 		}
 		if (g_originalMouseLeftClickWithSomeThing) {
 			DetourDetach(&(PVOID&)g_originalMouseLeftClickWithSomeThing, HookedMouseLeftClickWithSomeThing);
@@ -460,8 +467,22 @@ namespace board_runtime {
 
 	void* GetBoardInstance() {
 		std::lock_guard<std::mutex> lock(g_boardMutex);
-		if (g_boardInstance) {
-			return g_boardInstance;
+
+		const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
+		if (!assembly) {
+			LOG_WARNING("未找到 Assembly-CSharp.dll 程序集");
+			return nullptr;
+		}
+
+		const auto boardClass = assembly->Get("Board");
+		if (!boardClass) {
+			LOG_WARNING("未找到 Board 类");
+			return nullptr;
+		}
+
+		const auto instances = boardClass->FindObjectsByType<void*>();
+		if (!instances.empty() && instances[0]) {
+			return instances[0];
 		}
 
 		LOG_WARNING("通过所有方式都未获取到 Board 实例");
@@ -544,7 +565,6 @@ namespace board_runtime {
 
 		SetBoardBoolField("rightPutPot", enabled);
 	}
-
 	void CreateFireLine(int theFireRow) {
 		try {
 			void* boardInstance = GetBoardInstance();
@@ -565,16 +585,25 @@ namespace board_runtime {
 				return;
 			}
 
-			const auto createFireLineMethod = boardClass->Get<UnityResolve::Method>("SetRedLine");
+			const auto createFireLineMethod = boardClass->Get<UnityResolve::Method>("CreateFireLine");
 			if (!createFireLineMethod) {
 				LOG_ERROR("CreateFireLine 未找到 Board::CreateFireLine 方法！");
 				return;
 			}
 
-			createFireLineMethod->Invoke<void>(
-				boardInstance,
-				theFireRow
-			);
+			auto task = [=]() {
+				createFireLineMethod->Invoke<void>(
+					boardInstance,
+					theFireRow
+				);
+			};
+
+			if (g_mainThreadDispatcherInstalled.load(std::memory_order_acquire)) {
+				RunOnMainThread(std::move(task));
+				return;
+			}
+
+			LOG_WARNING("MainThread Dispatcher 未安装");
 		}
 		catch (const std::exception& e) {
 			LOG_ERROR(std::format("CreateFireLine 异常: {}", e.what()).c_str());
@@ -836,4 +865,137 @@ namespace board_runtime {
 			LOG_ERROR(std::format("SetSun 异常: {}", e.what()).c_str());
 		}
 	}
+
+	void CreatePlant(int newColumn, int newRow, int theSeedType) {
+		auto createPlantTask = [=]() {
+			try {
+				const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
+				if (!assembly) {
+					LOG_ERROR("CreatePlant: Assembly not found");
+					return;
+				}
+
+				const auto klass = assembly->Get("CreatePlant");
+				if (!klass) {
+					LOG_ERROR("CreatePlant: Class not found");
+					return;
+				}
+
+				const auto objects = klass->FindObjectsByType<void*>();
+				if (objects.empty() || !objects[0]) {
+					LOG_ERROR("CreatePlant: Instance not found");
+					return;
+				}
+
+				static const std::vector<std::string> setPlantArgs = {
+					"System.Int32",
+					"System.Int32",
+					"PlantType",
+					"Plant",
+					"UnityEngine.Vector2",
+					"System.Boolean",
+					"System.Boolean",
+					"Plant"
+				};
+				auto method = klass->Get<UnityResolve::Method>("SetPlant", setPlantArgs);
+				if (!method) {
+					method = klass->Get<UnityResolve::Method>("SetPlant");
+				}
+				if (!method) {
+					LOG_ERROR("CreatePlant: Method not found");
+					return;
+				}
+
+				UnityResolve::UnityType::Vector2 puffV{};
+				puffV.x = 0.0f;
+				puffV.y = 0.0f;
+
+				LOG_INFO(std::format("CreatePlant MainThread thread={}", GetCurrentThreadId()).c_str());
+				method->Invoke<void*>(
+					objects[0],
+					newColumn,
+					newRow,
+					theSeedType,
+					nullptr,
+					puffV,
+					false,
+					true,
+					nullptr
+				);
+			}
+			catch (const std::exception& e) {
+				LOG_ERROR(std::format("CreatePlant Exception: {}", e.what()).c_str());
+			}
+			catch (...) {
+				LOG_ERROR("CreatePlant Unknown Exception");
+			}
+		};
+
+		if (g_mainThreadDispatcherInstalled.load(std::memory_order_acquire)) {
+			RunOnMainThread(std::move(createPlantTask));
+			return;
+		}
+
+		LOG_WARNING("MainThread Dispatcher 未安装");
+	}
+
+	std::string GetPlantList() {
+		try {
+			const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
+			if (!assembly) {
+				LOG_ERROR("GetPlantList 未找到程序集！");
+				return "{\"Class\":\"PlantType\",\"Error\":\"assembly_not_found\",\"Items\":[]}";
+			}
+
+			const auto enumClass = assembly->Get("PlantType", "*");
+			if (!enumClass) {
+				LOG_ERROR("GetPlantList 未找到 PlantType 枚举类！");
+				return "{\"Class\":\"PlantType\",\"Error\":\"enum_class_not_found\",\"Items\":[]}";
+			}
+
+			const auto enumValues = board_runtime::common::GetEnumValues<int>(enumClass);
+			std::vector<std::pair<std::string, int>> items;
+			items.reserve(enumValues.size());
+			for (const auto& [name, value] : enumValues) {
+				items.emplace_back(name, value);
+			}
+
+			std::sort(items.begin(), items.end(), [](const auto& left, const auto& right) {
+				if (left.second != right.second) {
+					return left.second < right.second;
+				}
+				return left.first < right.first;
+			});
+
+			std::string json;
+			json.reserve(items.size() * 48 + 32);
+			json.append("{\"Class\":\"PlantType\",\"Items\":[");
+
+			bool first = true;
+			for (const auto& [name, value] : items) {
+				if (!first) {
+					json.push_back(',');
+				}
+				json.append(std::format(
+					"{{\"name\":\"{}\",\"value\":{}}}",
+					EscapeJsonString(name),
+					value
+				));
+				first = false;
+			}
+
+			json.append("]}");
+			return json;
+		}
+		catch (const std::exception& e) {
+			LOG_ERROR(std::format("GetPlantList 异常: {}", e.what()).c_str());
+			return std::format(
+				"{{\"Class\":\"PlantType\",\"Error\":\"{}\",\"Items\":[]}}",
+				EscapeJsonString(e.what())
+			);
+		}
+	}
 }
+
+
+

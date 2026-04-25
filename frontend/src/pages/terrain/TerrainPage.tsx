@@ -1,5 +1,5 @@
 import { ReloadOutlined } from '@ant-design/icons';
-import { Button, message } from 'antd';
+import { Button, message, Select } from 'antd';
 import { type CSSProperties, useCallback, useEffect, useMemo, useState } from 'react';
 import './TerrainPage.css';
 
@@ -28,10 +28,16 @@ type TerrainContextMenuState = {
   cell: GridCell;
 };
 
+type PlantListItem = {
+  name: string;
+  value: number;
+};
+
 const boardRefreshIntervalMs = 1200;
 const maxGridCellCount = 2000;
 const contextMenuWidthPx = 198;
 const contextMenuHeightPx = 164;
+const plantSelectionStorageKey = 'terrain:lastPlantType';
 
 function resolveErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
@@ -49,6 +55,21 @@ function toPositiveInteger(value: unknown): number | null {
   if (typeof value === 'string') {
     const parsed = Number.parseInt(value, 10);
     if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function toInteger(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isFinite(parsed)) {
       return parsed;
     }
   }
@@ -75,6 +96,54 @@ function normalizeBoardSnapshot(rawData: unknown): BoardSnapshot {
   return { Fields: fields };
 }
 
+function normalizePlantList(rawData: unknown): PlantListItem[] {
+  if (!rawData || typeof rawData !== 'object') {
+    return [];
+  }
+
+  const candidate = rawData as Record<string, unknown>;
+  if (!Array.isArray(candidate.Items)) {
+    return [];
+  }
+
+  return candidate.Items
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .map((item) => {
+      const name = typeof item.name === 'string' ? item.name : '';
+      const value = toInteger(item.value);
+      if (name.length === 0 || value === null) {
+        return null;
+      }
+      return { name, value };
+    })
+    .filter((item): item is PlantListItem => item !== null);
+}
+
+function readRememberedPlantValue(): number | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(plantSelectionStorageKey);
+    if (rawValue === null) {
+      return null;
+    }
+    return toInteger(rawValue);
+  } catch {
+    return null;
+  }
+}
+
+function resolvePlantValue(items: PlantListItem[], preferredValue: number | null): number | null {
+  if (preferredValue !== null && items.some((item) => item.value === preferredValue)) {
+    return preferredValue;
+  }
+
+  const fallback = items.find((item) => item.value >= 0) ?? items[0];
+  return fallback ? fallback.value : null;
+}
+
 function formatDateTime(timestamp: number | null): string {
   if (timestamp === null) {
     return '--';
@@ -83,39 +152,6 @@ function formatDateTime(timestamp: number | null): string {
   return new Date(timestamp).toLocaleString('zh-CN', {
     hour12: false,
   });
-}
-
-async function writeTextToClipboard(text: string): Promise<boolean> {
-  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-    }
-  }
-
-  if (typeof document === 'undefined') {
-    return false;
-  }
-
-  const textarea = document.createElement('textarea');
-  textarea.value = text;
-  textarea.setAttribute('readonly', 'true');
-  textarea.style.position = 'fixed';
-  textarea.style.top = '-9999px';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.select();
-
-  let copied = false;
-  try {
-    copied = document.execCommand('copy');
-  } catch {
-    copied = false;
-  }
-
-  document.body.removeChild(textarea);
-  return copied;
 }
 
 function TerrainPage({ isInjected }: TerrainPageProps) {
@@ -127,6 +163,11 @@ function TerrainPage({ isInjected }: TerrainPageProps) {
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [selectedCellId, setSelectedCellId] = useState('');
   const [contextMenu, setContextMenu] = useState<TerrainContextMenuState | null>(null);
+  const [plantOptions, setPlantOptions] = useState<PlantListItem[]>([]);
+  const [plantLoading, setPlantLoading] = useState(false);
+  const [plantLoadingError, setPlantLoadingError] = useState('');
+  const [planting, setPlanting] = useState(false);
+  const [selectedPlantValue, setSelectedPlantValue] = useState<number | null>(() => readRememberedPlantValue());
 
   const closeContextMenu = useCallback(() => {
     setContextMenu(null);
@@ -171,6 +212,33 @@ function TerrainPage({ isInjected }: TerrainPageProps) {
     }
   }, [isInjected]);
 
+  const fetchPlantOptions = useCallback(async () => {
+    if (!isInjected) {
+      return;
+    }
+
+    setPlantLoading(true);
+    setPlantLoadingError('');
+    try {
+      const rawResult = await 'GetPlantList'.invoke();
+      const parsedResult =
+        typeof rawResult === 'string'
+          ? normalizePlantList(JSON.parse(rawResult) as unknown)
+          : normalizePlantList(rawResult);
+
+      if (parsedResult.length === 0) {
+        throw new Error('GetPlantList 未返回可用植物列表');
+      }
+
+      setPlantOptions(parsedResult);
+      setSelectedPlantValue((prev) => resolvePlantValue(parsedResult, prev ?? readRememberedPlantValue()));
+    } catch (error) {
+      setPlantLoadingError(resolveErrorMessage(error));
+    } finally {
+      setPlantLoading(false);
+    }
+  }, [isInjected]);
+
   useEffect(() => {
     if (!isInjected) {
       setRowCount(0);
@@ -181,11 +249,16 @@ function TerrainPage({ isInjected }: TerrainPageProps) {
       setLoading(false);
       setManualRefreshing(false);
       closeContextMenu();
+      setPlantOptions([]);
+      setPlantLoading(false);
+      setPlantLoadingError('');
+      setPlanting(false);
       return;
     }
 
     setLoading(true);
     void fetchBoardDimensions(false);
+    void fetchPlantOptions();
     const timer = window.setInterval(() => {
       void fetchBoardDimensions(false);
     }, boardRefreshIntervalMs);
@@ -193,7 +266,18 @@ function TerrainPage({ isInjected }: TerrainPageProps) {
     return () => {
       window.clearInterval(timer);
     };
-  }, [closeContextMenu, fetchBoardDimensions, isInjected]);
+  }, [closeContextMenu, fetchBoardDimensions, fetchPlantOptions, isInjected]);
+
+  useEffect(() => {
+    if (selectedPlantValue === null || typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(plantSelectionStorageKey, String(selectedPlantValue));
+    } catch {
+    }
+  }, [selectedPlantValue]);
 
   const totalCellCount = rowCount * columnCount;
   const exceedsCellLimit = totalCellCount > maxGridCellCount;
@@ -264,10 +348,27 @@ function TerrainPage({ isInjected }: TerrainPageProps) {
     };
   }, [closeContextMenu, contextMenu]);
 
-  const selectedCell = useMemo(
-    () => cells.find((cell) => cell.id === selectedCellId) ?? null,
-    [cells, selectedCellId],
-  );
+  const handleCreatePlantAtCell = useCallback(async (cell: GridCell) => {
+    if (selectedPlantValue === null) {
+      message.warning('请选择要种植的植物');
+      return;
+    }
+
+    const newColumn = cell.column - 1;
+    const newRow = cell.row - 1;
+    setPlanting(true);
+    try {
+      await 'CreatePlant'.invoke(newColumn, newRow, selectedPlantValue);
+      const plantName = plantOptions.find((item) => item.value === selectedPlantValue)?.name ?? String(selectedPlantValue);
+      message.success(`已在第 ${cell.row} 行，第 ${cell.column} 列种植 ${plantName}`);
+    } catch (error) {
+      message.error(`种植失败：${resolveErrorMessage(error)}`);
+    } finally {
+      setPlanting(false);
+    }
+  }, [plantOptions, selectedPlantValue]);
+
+
 
   const contextMenuStyle = useMemo<CSSProperties | null>(() => {
     if (!contextMenu) {
@@ -296,32 +397,47 @@ function TerrainPage({ isInjected }: TerrainPageProps) {
       return;
     }
 
+    if (planting) {
+      message.warning('正在处理上一次种植，请稍候');
+      closeContextMenu();
+      return;
+    }
+
     const cell = contextMenu.cell;
-    if (action === 'CreateFireLine') {
+    if (action === 'SetPit') {
       "SetPit".invoke(cell.column - 1, cell.row - 1)
       closeContextMenu();
       return;
     }
 
-    if (action === 'copyJson') {
-      const text = JSON.stringify({ row: cell.row, column: cell.column });
-      const copied = await writeTextToClipboard(text);
-      if (copied) {
-        message.success(`已复制：${text}`);
-      } else {
-        message.warning('复制失败，请手动复制坐标');
-      }
+    if (action === 'CreateFireLine') {
+      "CreateFireLine".invoke(cell.row - 1)
       closeContextMenu();
       return;
     }
 
-    if (action === 'select') {
-      setSelectedCellId(cell.id);
-      message.success(`已选中：第 ${cell.row} 行，第 ${cell.column} 列`);
+    if (action === 'createPlant') {
+      if (plantLoading) {
+        message.warning('植物列表加载中，请稍后再试');
+        closeContextMenu();
+        return;
+      }
+
+      if (plantOptions.length === 0) {
+        if (plantLoadingError) {
+          message.error(`植物列表不可用：${plantLoadingError}`);
+        } else {
+          message.warning('植物列表为空，请先刷新植物列表');
+        }
+        closeContextMenu();
+        return;
+      }
+
+      await handleCreatePlantAtCell(cell);
       closeContextMenu();
       return;
     }
-  }, [closeContextMenu, contextMenu]);
+  }, [closeContextMenu, contextMenu, handleCreatePlantAtCell, plantLoading, plantLoadingError, plantOptions.length, planting]);
 
   return (
     <section className="settings-section">
@@ -383,13 +499,14 @@ function TerrainPage({ isInjected }: TerrainPageProps) {
           {!exceedsCellLimit && cells.length > 0 ? (
             <div className="terrain-grid-card">
               <div className="terrain-grid-toolbar">
-                <span>地形网格</span>
-                <span>
-                  {selectedCell
-                    ? `当前选中：第 ${selectedCell.row} 行，第 ${selectedCell.column} 列`
-                    : '左键选中格子，右键打开操作菜单'}
-                </span>
-
+                <span>快捷功能</span>
+                <Button onClick={async () => {
+                  for (let row = 0; row < rowCount; row++) {
+                    for (let column = 0; column < columnCount; column++) {
+                      await 'CreatePlant'.invoke(column, row, selectedPlantValue);
+                    }
+                  }
+                }}>全屏种植物🌳</Button>
                 <Button onClick={() => {
                   for (let row = 0; row < rowCount; row++) {
                     for (let column = 0; column < columnCount; column++) {
@@ -397,7 +514,46 @@ function TerrainPage({ isInjected }: TerrainPageProps) {
                     }
                   }
                 }}>全屏种坑</Button>
+
+                <Button onClick={() => {
+                  for (let row = 0; row < rowCount; row++) {
+                    "CreateFireLine".invoke(row)
+                  }
+                }}>全屏放火🔥</Button>
               </div>
+
+              <div className="terrain-plant-toolbar">
+                <span className="terrain-plant-label">种植植物</span>
+                <Select<number>
+                  loading={plantLoading}
+                  onChange={(value) => {
+                    setSelectedPlantValue(value);
+                  }}
+                  optionFilterProp="label"
+                  options={plantOptions.map((item) => ({
+                    value: item.value,
+                    label: `${item.name} (${item.value})`,
+                  }))}
+                  placeholder="请选择植物"
+                  showSearch
+                  style={{ minWidth: 280, flex: '1 1 260px' }}
+                  value={selectedPlantValue ?? undefined}
+                />
+                <Button
+                  loading={plantLoading}
+                  onClick={() => {
+                    void fetchPlantOptions();
+                  }}
+                >
+                  刷新植物列表
+                </Button>
+              </div>
+
+              {plantLoadingError ? (
+                <div className="terrain-error terrain-plant-error">
+                  获取植物列表失败：{plantLoadingError}
+                </div>
+              ) : null}
 
               <div className="terrain-grid-scroll">
                 <div
@@ -449,10 +605,20 @@ function TerrainPage({ isInjected }: TerrainPageProps) {
               <div className="terrain-context-title">
                 第 {contextMenu.cell.row} 行 · 第 {contextMenu.cell.column} 列
               </div>
+
               <button
                 className="terrain-context-item"
                 onClick={() => {
-                  void handleContextAction('CreateFireLine');
+                  void handleContextAction('createPlant');
+                }}
+                type="button"
+              >
+                种植植物
+              </button>
+              <button
+                className="terrain-context-item"
+                onClick={() => {
+                  void handleContextAction('SetPit');
                 }}
                 type="button"
               >
@@ -461,13 +627,12 @@ function TerrainPage({ isInjected }: TerrainPageProps) {
               <button
                 className="terrain-context-item"
                 onClick={() => {
-                  void handleContextAction('copyJson');
+                  void handleContextAction('CreateFireLine');
                 }}
                 type="button"
               >
-                复制 JSON 坐标
+                放火🔥
               </button>
-
             </div>
           ) : null}
         </>
