@@ -685,36 +685,6 @@ namespace board_runtime {
 		}
 	}
 
-	bool GetFreeCD() {
-		try {
-			void* boardInstance = GetBoardInstance();
-			if (!boardInstance) {
-				LOG_ERROR("GetFreeCD 未找到 Board 实例！");
-				return false;
-			}
-
-			const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
-			if (!assembly) {
-				return false;
-			}
-
-			const auto boardClass = assembly->Get("Board");
-			if (!boardClass) {
-				return false;
-			}
-
-			const auto freeCD = boardClass->Get<UnityResolve::Field>("freeCD");
-			if (freeCD) {
-				return boardClass->GetValue<int>(boardInstance, freeCD->name) == 1;
-			}
-		}
-		catch (const std::exception& e) {
-			LOG_ERROR(std::format("GetFreeCD 异常: {}", e.what()).c_str());
-		}
-
-		return false;
-	}
-
 	std::string GetBoardFieldsJson() {
 		try {
 			const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
@@ -776,64 +746,6 @@ namespace board_runtime {
 			LOG_ERROR(std::format("GetBoardFieldsJson 异常: {}", e.what()).c_str());
 			return std::format("{{\"Class\":\"Board\",\"Error\":\"{}\",\"Fields\":[]}}", EscapeJsonString(e.what()));
 		}
-	}
-
-	int GetBoardWave() {
-		try {
-			void* boardInstance = GetBoardInstance();
-			if (!boardInstance) {
-				return -1;
-			}
-
-			const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
-			if (!assembly) {
-				return -1;
-			}
-
-			const auto boardClass = assembly->Get("Board");
-			if (!boardClass) {
-				return -1;
-			}
-
-			const auto waveField = boardClass->Get<UnityResolve::Field>("theWave");
-			if (waveField) {
-				return boardClass->GetValue<int>(boardInstance, waveField->name);
-			}
-		}
-		catch (const std::exception& e) {
-			LOG_ERROR(std::format("GetBoardWave 异常: {}", e.what()).c_str());
-		}
-
-		return -1;
-	}
-
-	int GetSun() {
-		try {
-			void* boardInstance = GetBoardInstance();
-			if (!boardInstance) {
-				return -1;
-			}
-
-			const auto assembly = UnityResolve::Get("Assembly-CSharp.dll");
-			if (!assembly) {
-				return -1;
-			}
-
-			const auto boardClass = assembly->Get("Board");
-			if (!boardClass) {
-				return -1;
-			}
-
-			const auto sunField = boardClass->Get<UnityResolve::Field>("theSun");
-			if (sunField) {
-				return boardClass->GetValue<int>(boardInstance, sunField->name);
-			}
-		}
-		catch (const std::exception& e) {
-			LOG_ERROR(std::format("GetSun 异常: {}", e.what()).c_str());
-		}
-
-		return -1;
 	}
 
 	void SetSun(int sunCount) {

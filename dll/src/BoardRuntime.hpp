@@ -29,10 +29,7 @@ namespace board_runtime {
 	void SetPit(int theColumn, int theRo);
 	bool StartNextRound();
 	std::string GetPlantList();
-	bool GetFreeCD();
 	std::string GetBoardFieldsJson();
-	int GetBoardWave();
-	int GetSun();
 	void SetSun(int sunCount);
 	void CreatePlant(int newColumn, int newRow, int theSeedType);
 }

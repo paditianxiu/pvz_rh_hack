@@ -6,12 +6,12 @@ import {
   SettingOutlined,
   ToolOutlined,
 } from '@ant-design/icons';
-import { Call, Events } from '@wailsio/runtime';
+import { Events } from '@wailsio/runtime';
 import { Button, InputNumber, Switch, message } from 'antd';
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { GetProcessPID, InjectDLL, UnloadDLL } from '../bindings/changeme/processservice';
+import { GetProcessPID, InjectDLL, SetOverlayVisible, SyncOverlayWindow, UnloadDLL } from '../bindings/changeme/processservice';
 import { overlayVisibilityEventName, overlayVisibilityStorageKey } from './constants/overlay';
 import OverlayPage from './OverlayPage';
 import SettingRow from './components/SettingRow';
@@ -56,15 +56,6 @@ const initialCheatToggleState: Record<string, boolean> = {
   randomCard: false,
 };
 
-const processServiceNameCandidates = [
-  'main.ProcessService.SetOverlayVisible',
-  'changeme.ProcessService.SetOverlayVisible',
-];
-
-const syncOverlayMethodCandidates = [
-  'main.ProcessService.SyncOverlayWindow',
-  'changeme.ProcessService.SyncOverlayWindow',
-];
 
 function PlaceholderPage({ title, description }: PlaceholderPageProps) {
   return (
@@ -158,39 +149,14 @@ function App() {
     }
   };
 
-  const callFirstAvailable = async (candidates: string[], ...args: unknown[]) => {
-    let lastError: unknown;
-
-    for (const methodName of candidates) {
-      try {
-        await Call.ByName(methodName, ...args);
-        return;
-      } catch (error: unknown) {
-        const errorName =
-          typeof error === 'object' && error !== null && 'name' in error
-            ? String((error as { name: unknown }).name)
-            : '';
-
-        if (errorName === 'ReferenceError') {
-          lastError = error;
-          continue;
-        }
-
-        throw error;
-      }
-    }
-
-    throw lastError ?? new Error('未找到可用的 ProcessService 方法');
-  };
 
   const syncOverlayWindow = async () => {
     if (syncingOverlayRef.current) {
       return;
     }
-
     syncingOverlayRef.current = true;
     try {
-      await callFirstAvailable(syncOverlayMethodCandidates, gameName);
+      await SyncOverlayWindow(gameName)
     } finally {
       syncingOverlayRef.current = false;
     }
@@ -199,7 +165,7 @@ function App() {
   const handleOverlayVisibleChange = async (checked: boolean) => {
     setOverlayLoading(true);
     try {
-      await callFirstAvailable(processServiceNameCandidates, gameName, checked);
+      await SetOverlayVisible(gameName, checked)
       setOverlayVisible(checked);
       message.success(`僵尸射线${checked ? '已显示' : '已隐藏'}`);
       if (checked) {

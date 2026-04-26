@@ -490,18 +490,8 @@ namespace ipc {
 						const bool enabled = ToBool(args[0]);
 						board_runtime::SetRightPutPot(enabled);
 						return RpcValue::FromBool(enabled);
-						
-				}
-				},
-				{
-					"GetFreeCD",
-					[](const std::vector<RpcValue>& args) -> RpcValue {
-						if (!args.empty()) {
-							throw std::runtime_error("GetFreeCD 需要 0 个参数");
-						}
 
-						return RpcValue::FromBool(board_runtime::GetFreeCD());
-				},
+				}
 				},
 				{
 					"StartNextRound",
@@ -568,16 +558,6 @@ namespace ipc {
 						const int32_t theRow = ToInt32(args[1]);
 						board_runtime::SetPit(theColumn, theRow);
 						return RpcValue::FromInt32(0);
-					}
-				},
-				{
-					"GetSun",
-					[](const std::vector<RpcValue>& args) -> RpcValue {
-						if (!args.empty()) {
-							throw std::runtime_error("GetSun 需要 0 个参数");
-						}
-
-						return RpcValue::FromInt32(board_runtime::GetSun());
 					}
 				},
 				{

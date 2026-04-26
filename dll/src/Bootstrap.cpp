@@ -40,22 +40,21 @@ void InitializeFeatures() {
     }
     else {
         LOG_WARNING("安装 Board 钩子失败，将使用回退方式");
-    }
+	}
 
-    const auto instance = board_runtime::GetBoardInstance();
-    if (instance) {
-        LOG_INFO(std::format("初始 Board 实例: 0x{:X}", reinterpret_cast<uintptr_t>(instance)).c_str());
-        LOG_INFO(std::format("初始状态 - 波次: {}，阳光: {}", board_runtime::GetBoardWave(), board_runtime::GetSun()).c_str());
-    }
-    else {
-        LOG_WARNING("初始化阶段不可用 Board 实例");
-    }
+	const auto instance = board_runtime::GetBoardInstance();
+	if (instance) {
+		LOG_INFO(std::format("初始 Board 实例: 0x{:X}", reinterpret_cast<uintptr_t>(instance)).c_str());
+	}
+	else {
+		LOG_WARNING("初始化阶段不可用 Board 实例");
+	}
 
-    if (IsStopRequested()) {
-        return;
-    }
+	if (IsStopRequested()) {
+		return;
+	}
 
-    board_runtime::SetFreeCD(false);
+	board_runtime::SetFreeCD(false);
 
     LOG_INFO("功能初始化完成");
 }
