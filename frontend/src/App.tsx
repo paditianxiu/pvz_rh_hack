@@ -19,6 +19,9 @@ import HistoryPage from './pages/history/HistoryPage';
 import TerrainPage from './pages/terrain/TerrainPage';
 import './App.css';
 
+const isDebug = import.meta.env.DEV;
+
+
 type NavItem = {
   path: string;
   label: string;
@@ -29,7 +32,6 @@ type PlaceholderPageProps = {
   title: string;
   description: string;
 };
-
 
 
 type CheatToggleConfig = {
@@ -72,7 +74,6 @@ function App() {
   const location = useLocation();
   const gameName = 'PlantsVsZombiesRH.exe';
   const defaultSunValue = 9999;
-  const isDebug = false;
   const dllPath = isDebug ? 'D:/Application/Code/Wails/pvz_rh_hack/payload/MyDLL.dll' : '';
 
   const navItems: NavItem[] = [
@@ -265,6 +266,16 @@ function App() {
                           </Button>
                         </div>
                       </SettingRow>
+                      {/* <SettingRow label="测试">
+                        <div className="setting-actions">
+                          <Button type="primary" onClick={async () => {
+                            const raw = await 'GetZombiePositions'.invoke();
+                            console.log(raw)
+                          }}>
+                            应用
+                          </Button>
+                        </div>
+                      </SettingRow> */}
                       {cheatToggleConfigs.map((config) => (
                         <SettingRow key={config.key} label={config.label}>
                           <Switch

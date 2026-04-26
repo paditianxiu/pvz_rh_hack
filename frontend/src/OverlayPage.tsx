@@ -1,15 +1,12 @@
-import { Call, Events, Window } from '@wailsio/runtime';
+import { Events, Window } from '@wailsio/runtime';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { overlayVisibilityEventName, overlayVisibilityStorageKey } from './constants/overlay';
 import { parseZombiePositions } from './features/zombie/parser';
 import { type ZombiePoint } from './features/zombie/types';
+import { SyncOverlayWindow } from '../bindings/changeme/processservice';
 
 const zombiePollIntervalMs = 120;
 const gameProcessName = 'PlantsVsZombiesRH.exe';
-const syncOverlayMethodCandidates = [
-  'main.ProcessService.SyncOverlayWindow',
-  'changeme.ProcessService.SyncOverlayWindow',
-];
 
 
 function readOverlayVisibilityFromStorage(): boolean {
@@ -20,30 +17,6 @@ function readOverlayVisibilityFromStorage(): boolean {
   }
 }
 
-async function callFirstAvailable(candidates: string[], ...args: unknown[]) {
-  let lastError: unknown;
-
-  for (const methodName of candidates) {
-    try {
-      await Call.ByName(methodName, ...args);
-      return;
-    } catch (error: unknown) {
-      const errorName =
-        typeof error === 'object' && error !== null && 'name' in error
-          ? String((error as { name: unknown }).name)
-          : '';
-
-      if (errorName === 'ReferenceError') {
-        lastError = error;
-        continue;
-      }
-
-      throw error;
-    }
-  }
-
-  throw lastError ?? new Error('未找到可用的 ProcessService 方法');
-}
 
 function OverlayPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -128,7 +101,7 @@ function OverlayPage() {
           return;
         }
 
-        await callFirstAvailable(syncOverlayMethodCandidates, gameProcessName);
+        await SyncOverlayWindow(gameProcessName);
         await Window.SetAlwaysOnTop(true);
         if (disposed) {
           return;

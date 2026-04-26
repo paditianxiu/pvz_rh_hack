@@ -1,4 +1,8 @@
-import { Invoke } from '../bindings/changeme/processservice'
+import { Invoke } from "../bindings/changeme/processservice"
+
+
+
+
 
 
 declare global {
@@ -9,7 +13,8 @@ declare global {
 
 Object.defineProperty(String.prototype, 'invoke', {
   value: async function invoke(this: string, ...params: unknown[]) {
-    await Invoke(this.toString(), params)
+    const resutl = await Invoke(this.toString(), params)
+    return resutl
   },
   writable: true,
   configurable: true,
